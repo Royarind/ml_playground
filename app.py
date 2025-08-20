@@ -318,17 +318,17 @@ def preview_card(df: Optional[pd.DataFrame], name: Optional[str] = None):
 ###########################################################
 
 if page == "Home":
-    st.title("🤖 ML Playground - Step by Step Guide")
+    st.title("ML Playground - Step by Step Guide")
     st.write("Welcome to the Machine Learning Playground! Follow these steps to build, train, and deploy your ML models.")
     
     ensure_session_state()
     inject_css()
 
     # Step-by-step guide
-    st.markdown("## 📋 Step-by-Step Workflow")
+    st.markdown("##Step-by-Step Workflow")
     
     # Step 1: Data Loading
-    with st.expander("🚀 Step 1: Load Your Data", expanded=True):
+    with st.expander("Step 1: Load Your Data", expanded=True):
         st.markdown("""
         **Start by loading your dataset:**
         
@@ -353,7 +353,7 @@ if page == "Home":
             st.success("✅ Dataset loaded! You can now proceed to Step 2.")
 
     # Step 2: EDA
-    with st.expander("🔍 Step 2: Explore & Clean Your Data"):
+    with st.expander("Step 2: Explore & Clean Your Data"):
         st.markdown("""
         **Explore and prepare your data:**
         
@@ -370,7 +370,7 @@ if page == "Home":
         """)
 
     # Step 3: Train-Test Split
-    with st.expander("✂️ Step 3: Split Your Data"):
+    with st.expander("Step 3: Split Your Data"):
         st.markdown("""
         **Prepare for model training:**
         
@@ -384,7 +384,7 @@ if page == "Home":
         """)
 
     # Step 4: Pipeline Building
-    with st.expander("⚙️ Step 4: Build Your Pipeline"):
+    with st.expander("Step 4: Build Your Pipeline"):
         st.markdown("""
         **Create preprocessing and modeling pipeline:**
         
@@ -400,7 +400,7 @@ if page == "Home":
         """)
 
     # Step 5: Training & Tuning
-    with st.expander("🎯 Step 5: Train & Optimize Models"):
+    with st.expander("Step 5: Train & Optimize Models"):
         st.markdown("""
         **Fine-tune your models:**
         
@@ -411,11 +411,11 @@ if page == "Home":
         
         **→ Go to:** **Training** page in the sidebar
         
-        **💡 Tip**: Use different search strategies for optimal results
+        **Tip**: Use different search strategies for optimal results
         """)
 
     # Step 6: Evaluation
-    with st.expander("📊 Step 6: Evaluate Model Performance"):
+    with st.expander("Step 6: Evaluate Model Performance"):
         st.markdown("""
         **Comprehensive model evaluation:**
         
@@ -427,11 +427,11 @@ if page == "Home":
         
         **→ Go to:** **Final Evaluation** page in the sidebar
         
-        **💡 Tip**: Look at multiple metrics to get a complete picture
+        **Tip**: Look at multiple metrics to get a complete picture
         """)
 
     # Step 7: Export & Deployment
-    with st.expander("📦 Step 7: Export & Deploy"):
+    with st.expander("Step 7: Export & Deploy"):
         st.markdown("""
         **Package and deploy your solution:**
         
@@ -446,7 +446,7 @@ if page == "Home":
         """)
 
     # Step 8: Prediction
-    with st.expander("🔮 Step 8: Make Predictions"):
+    with st.expander("Step 8: Make Predictions"):
         st.markdown("""
         **Use your trained models for inference:**
         
@@ -458,46 +458,46 @@ if page == "Home":
         
         **→ Go to:** **Prediction** page in the sidebar
         
-        **💡 Tip**: Test your model with edge cases to ensure robustness
+        **Tip**: Test your model with edge cases to ensure robustness
         """)
 
     # Quick status dashboard
     st.markdown("---")
-    st.markdown("## 📈 Current Project Status")
+    st.markdown("##Current Project Status")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
         if st.session_state.df is not None:
-            st.success("✅ Data Loaded")
+            st.success("Data Loaded")
             st.caption(f"{st.session_state.df.shape[0]} rows × {st.session_state.df.shape[1]} columns")
         else:
-            st.warning("❌ No Data")
+            st.warning("No Data")
             st.caption("Complete Step 1")
     
     with col2:
         if "split_result" in st.session_state:
-            st.success("✅ Data Split")
+            st.success("Data Split")
             split = st.session_state["split_result"]
             train_size = len(split["X_train"])
             test_size = len(split["X_test"])
             st.caption(f"Train: {train_size}, Test: {test_size}")
         else:
-            st.info("⏳ Ready for Split")
+            st.info("Ready for Split")
             st.caption("Complete Step 3")
     
     with col3:
         model_files = glob.glob("*.joblib") + glob.glob("*.pkl")
         if model_files:
-            st.success("✅ Models Trained")
+            st.success("Models Trained")
             st.caption(f"{len(model_files)} model(s) available")
         else:
-            st.info("⏳ Ready for Training")
+            st.info("Ready for Training")
             st.caption("Complete Step 4-5")
 
     # Quick actions
     st.markdown("---")
-    st.markdown("## ⚡ Quick Actions")
+    st.markdown("##Quick Actions")
     
     quick_col1, quick_col2, quick_col3 = st.columns(3)
     
@@ -512,17 +512,17 @@ if page == "Home":
     with quick_col3:
         st.markdown("### Need Help?")
         st.markdown("""
-        - 📚 Check each step's instructions
-        - 🔄 Use the sidebar to navigate
-        - 💾 Save your work frequently
-        - 🆘 Hover over options for tooltips
+        - Check each step's instructions
+        - Use the sidebar to navigate
+        - Save your work frequently
+        - Hover over options for tooltips
         """)
 
     # Footer
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
-        <p>Built with ❤️ using Streamlit | ML Playground v1.0</p>
+        <p>Built for YOU using Streamlit | ML Playground v1.0</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -534,9 +534,6 @@ if page == "Home":
 # ========================= pages/1_Data_Loading.py =========================
 # Data Loading Page for ML Playground
 # Save this as: pages/1_Data_Loading.py
-
-# ========================= pages/1_Data_Loading.py =========================
-# Unified Data Loading Page for ML Playground
 
 elif page == "Data Loading":
     st.header("Data Loading")

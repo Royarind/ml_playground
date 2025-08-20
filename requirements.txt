@@ -1,0 +1,30 @@
+# Core
+streamlit
+pandas
+numpy
+matplotlib
+seaborn
+plotly
+
+# Machine Learning
+scikit-learn
+xgboost
+lightgbm
+shap
+optuna
+
+# Profiling / EDA
+ydata-profiling
+streamlit-pandas-profiling
+
+# Persistence
+joblib
+
+# Database / IO
+sqlalchemy
+xlsxwriter
+kaggle
+
+# NLP (optional but used)
+nltk
+statsmodels

@@ -12,6 +12,7 @@ from sklearn.preprocessing import LabelEncoder as le
 import streamlit as st
 import pandas as pd
 import numpy as np
+import os
 import joblib
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -317,46 +318,213 @@ def preview_card(df: Optional[pd.DataFrame], name: Optional[str] = None):
 ###########################################################
 
 if page == "Home":
-    st.title("ML Playground")
-    st.write("Welcome...")
-
+    st.title("🤖 ML Playground - Step by Step Guide")
+    st.write("Welcome to the Machine Learning Playground! Follow these steps to build, train, and deploy your ML models.")
+    
     ensure_session_state()
     inject_css()
 
-    # Quick Start / Upload
-    left, right = st.columns([1, 1])
-    with left:
-        st.markdown("## Quick Start")
-        st.markdown(
-            "Use a sample dataset or upload your own. You can always download the current dataset and reload it later to continue where you left off.")
-
+    # Step-by-step guide
+    st.markdown("## 📋 Step-by-Step Workflow")
+    
+    # Step 1: Data Loading
+    with st.expander("🚀 Step 1: Load Your Data", expanded=True):
+        st.markdown("""
+        **Start by loading your dataset:**
+        
+        - **Upload File**: CSV or Excel files from your computer
+        - **Preloaded Dataset**: Sample datasets (Iris, Titanic, Diabetes, etc.)
+        - **From URL**: Load data from a public URL
+        - **SQL Database**: Connect to your database
+        - **Google Sheets**: Import from Google Sheets
+        - **Kaggle**: Download datasets from Kaggle
+        
+        **→ Go to:** **Data Loading** page in the sidebar
+        """)
+        
+        # Quick upload option on home page
+        st.markdown("---")
+        st.markdown("### Quick Start: Upload Your Data")
         new_df = upload_panel(key_prefix="home")
         if new_df is not None:
             st.session_state.df = new_df
             st.session_state.dataset_name = getattr(new_df, "_dataset_name", None) or "uploaded_or_sample"
-            # Save a version snapshot
             st.session_state.versions.append(("loaded", new_df.copy()))
-            st.success("Dataset is now active in this session.")
+            st.success("✅ Dataset loaded! You can now proceed to Step 2.")
 
-    with right:
-        preview_card(st.session_state.df, st.session_state.get("dataset_name"))
+    # Step 2: EDA
+    with st.expander("🔍 Step 2: Explore & Clean Your Data"):
+        st.markdown("""
+        **Explore and prepare your data:**
+        
+        - **Data Overview**: Summary statistics, missing values, data types
+        - **Data Cleaning**: Handle missing values, outliers, duplicates
+        - **Feature Engineering**: Create new features, transform variables
+        - **Visualizations**: Interactive charts and plots
+        - **Text Processing**: Clean and preprocess text columns
+        - **Automated Profiling**: Comprehensive data profile report
+        
+        **→ Go to:** **EDA** page in the sidebar
+        
+        **💡 Tip**: Use the snapshot feature to compare before/after changes
+        """)
 
+    # Step 3: Train-Test Split
+    with st.expander("✂️ Step 3: Split Your Data"):
+        st.markdown("""
+        **Prepare for model training:**
+        
+        - **Select Target Column**: Choose what you want to predict
+        - **Split Parameters**: Set test size, random state, validation split
+        - **Download Splits**: Export train/validation/test sets
+        
+        **→ Go to:** **Train-Test Split** page in the sidebar
+        
+        **💡 Tip**: Typical splits are 70-80% training, 20-30% testing
+        """)
+
+    # Step 4: Pipeline Building
+    with st.expander("⚙️ Step 4: Build Your Pipeline"):
+        st.markdown("""
+        **Create preprocessing and modeling pipeline:**
+        
+        - **Column Assignment**: Specify numeric vs categorical features
+        - **Numeric Pipeline**: Imputation, scaling strategies
+        - **Categorical Pipeline**: Encoding, imputation methods
+        - **Model Selection**: Choose algorithms for your problem type
+        - **Train Models**: Fit multiple models and compare performance
+        
+        **→ Go to:** **Pipeline** page in the sidebar
+        
+        **💡 Tip**: Start with simple models first, then try more complex ones
+        """)
+
+    # Step 5: Training & Tuning
+    with st.expander("🎯 Step 5: Train & Optimize Models"):
+        st.markdown("""
+        **Fine-tune your models:**
+        
+        - **Hyperparameter Tuning**: Grid search, random search, Optuna
+        - **Cross-Validation**: K-fold validation for robust evaluation
+        - **Early Stopping**: Prevent overfitting
+        - **Performance Metrics**: Track model performance
+        
+        **→ Go to:** **Training** page in the sidebar
+        
+        **💡 Tip**: Use different search strategies for optimal results
+        """)
+
+    # Step 6: Evaluation
+    with st.expander("📊 Step 6: Evaluate Model Performance"):
+        st.markdown("""
+        **Comprehensive model evaluation:**
+        
+        - **Performance Metrics**: Accuracy, Precision, Recall, F1, R², etc.
+        - **Confusion Matrix**: Visualize classification performance
+        - **ROC Curves**: Analyze model discrimination ability
+        - **SHAP Analysis**: Understand feature importance
+        - **Model Comparison**: Compare multiple models side-by-side
+        
+        **→ Go to:** **Final Evaluation** page in the sidebar
+        
+        **💡 Tip**: Look at multiple metrics to get a complete picture
+        """)
+
+    # Step 7: Export & Deployment
+    with st.expander("📦 Step 7: Export & Deploy"):
+        st.markdown("""
+        **Package and deploy your solution:**
+        
+        - **Model Export**: Save trained models and pipelines
+        - **Bundle Creation**: Package everything into a ZIP file
+        - **Metadata**: Add project information and documentation
+        - **Requirements**: Generate dependency list
+        
+        **→ Go to:** **Export** page in the sidebar
+        
+        **💡 Tip**: Always include a requirements.txt for reproducibility
+        """)
+
+    # Step 8: Prediction
+    with st.expander("🔮 Step 8: Make Predictions"):
+        st.markdown("""
+        **Use your trained models for inference:**
+        
+        - **Load Models**: Select from previously trained models
+        - **Single Prediction**: Input values for one prediction
+        - **Batch Prediction**: Upload file for multiple predictions
+        - **Class Decoding**: Get human-readable predictions
+        - **Probability Scores**: See prediction confidence levels
+        
+        **→ Go to:** **Prediction** page in the sidebar
+        
+        **💡 Tip**: Test your model with edge cases to ensure robustness
+        """)
+
+    # Quick status dashboard
     st.markdown("---")
+    st.markdown("## 📈 Current Project Status")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.session_state.df is not None:
+            st.success("✅ Data Loaded")
+            st.caption(f"{st.session_state.df.shape[0]} rows × {st.session_state.df.shape[1]} columns")
+        else:
+            st.warning("❌ No Data")
+            st.caption("Complete Step 1")
+    
+    with col2:
+        if "split_result" in st.session_state:
+            st.success("✅ Data Split")
+            split = st.session_state["split_result"]
+            train_size = len(split["X_train"])
+            test_size = len(split["X_test"])
+            st.caption(f"Train: {train_size}, Test: {test_size}")
+        else:
+            st.info("⏳ Ready for Split")
+            st.caption("Complete Step 3")
+    
+    with col3:
+        model_files = glob.glob("*.joblib") + glob.glob("*.pkl")
+        if model_files:
+            st.success("✅ Models Trained")
+            st.caption(f"{len(model_files)} model(s) available")
+        else:
+            st.info("⏳ Ready for Training")
+            st.caption("Complete Step 4-5")
 
-    # Navigation help
-    st.markdown("## What next?")
-    st.markdown(
-        "- Go to **Data Loading** for advanced sources (URL, Google Sheets, SQL, Kaggle).\n"
-        "- Visit **EDA** to explore, clean, and visualize your data.\n"
-        "- Use **Train-Test Split** then **ColumnTransformer + Pipeline** to build models.\n"
-        "- Finalize in **Training** and **Final Evaluation**, then **Prediction** for inference.")
-
-    # Download & Safety reminder
+    # Quick actions
     st.markdown("---")
-    download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
+    st.markdown("## ⚡ Quick Actions")
+    
+    quick_col1, quick_col2, quick_col3 = st.columns(3)
+    
+    with quick_col1:
+        if st.session_state.df is not None:
+            preview_card(st.session_state.df, st.session_state.get("dataset_name"))
+    
+    with quick_col2:
+        if st.session_state.df is not None:
+            download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
+    
+    with quick_col3:
+        st.markdown("### Need Help?")
+        st.markdown("""
+        - 📚 Check each step's instructions
+        - 🔄 Use the sidebar to navigate
+        - 💾 Save your work frequently
+        - 🆘 Hover over options for tooltips
+        """)
 
-    st.warning(
-        "**Reminder:** Save your progress by downloading the dataset before closing. **Do not rename** the file if you plan to reload it later.")
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div style='text-align: center; color: #666;'>
+        <p>Built with ❤️ using Streamlit | ML Playground v1.0</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 ################################################
@@ -1307,31 +1475,52 @@ elif page == "Pipeline":
 
             trained_pipes[name] = pipe
 
-        # Results summary
+        # Create results_df FIRST before using it
         results_df = pd.DataFrame(results).T
         styled_df = results_df.style.highlight_max(axis=0, color="lightgreen")
         st.dataframe(styled_df)
 
-        # Best model
+        # Save ALL trained models with descriptive filenames
+        for name, pipe in trained_pipes.items():
+            # Create safe filename (remove special characters)
+            safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+            filename = f"model_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.joblib"
+            
+            joblib.dump({
+                "pipeline": pipe,
+                "metrics": results[name],
+                "task_type": task_type,
+                "classes": y_train.unique().tolist() if task_type=="classification" else None,
+                "model_name": name,
+                "training_date": datetime.now().isoformat()
+            }, filename)
+            
+            st.success(f"Saved {name} as {filename}")
+
+        # Also save the best model separately for convenience
         if task_type == "classification":
             best_model_name = results_df["F1"].idxmax()
         else:
             best_model_name = results_df["R²"].idxmax()
 
         best_pipe = trained_pipes[best_model_name]
-        best_metrics = results_df.loc[best_model_name]
-
-        st.markdown("### Best Model Analysis")
-        st.write(f"Best model: **{best_model_name}**")
-        st.json(best_metrics.to_dict())
-
+        best_metrics = results_df.loc[best_model_name].to_dict()
+        
         joblib.dump({
             "pipeline": best_pipe,
-            "metrics": best_metrics.to_dict(),
+            "metrics": best_metrics,
             "task_type": task_type,
-            "classes": y_train.unique().tolist() if task_type=="classification" else None
+            "classes": y_train.unique().tolist() if task_type=="classification" else None,
+            "model_name": f"BEST_{best_model_name}",
+            "training_date": datetime.now().isoformat()
         }, "best_model_pipeline.joblib")
-        st.success("Best model saved as best_model_pipeline.joblib")
+        
+        st.success(f"Best model ({best_model_name}) saved as best_model_pipeline.joblib")
+        
+        # Show best model analysis
+        st.markdown("### Best Model Analysis")
+        st.write(f"Best model: **{best_model_name}**")
+        st.json(best_metrics)
 
 
 ##################################
@@ -1808,168 +1997,414 @@ elif page == "Download / Export":
 ###########################################
 elif page == "Prediction":
     st.header("Prediction")
-
     ensure_session_state()
     inject_css()
 
-    st.markdown("#Prediction")
+    st.markdown("# Prediction")
     st.caption("Load saved models and pipelines, perform batch or single-record inference, monitor drift.")
 
-    # --- Model Loader ------------------------------------------------------------
-    model_file = st.file_uploader("Upload trained model (.joblib/.pkl)", type=["joblib","pkl"])
-    loaded_model, meta_metrics, le_classes = None, None, None
+    # --- Model Loader ---
+    model_files = glob.glob("*.joblib") + glob.glob("*.pkl")
+    model_files = [f for f in model_files if not f.startswith('.')]
+    
+    st.markdown("## Select Model")
+    
+    if not model_files:
+        st.warning("No trained models found. Please train models on the Pipeline page first.")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        selected_model_file = st.selectbox(
+            "Choose a trained model",
+            options=[""] + model_files,
+            help="Select from previously trained models"
+        )
+    
+    with col2:
+        st.markdown("### Or upload new model")
+        uploaded_model_file = st.file_uploader(
+            "Upload model file", 
+            type=["joblib", "pkl"],
+            help="Upload a .joblib or .pkl file from your computer"
+        )
 
-    if model_file:
-        with open("uploaded_model.joblib", "wb") as f:
-            f.write(model_file.read())
+    # --- Load selected model ---
+    loaded_model, meta_metrics, target_classes, model_name, task_type = None, None, None, None, None
+    
+    if selected_model_file:
         try:
-            saved_obj = joblib.load("uploaded_model.joblib")
-
-            # Extract what we saved during training
+            saved_obj = joblib.load(selected_model_file)
+            st.success(f"Loaded model from: {selected_model_file}")
+        except Exception as e:
+            st.error(f"Failed to load {selected_model_file}: {e}")
+    
+    elif uploaded_model_file:
+        try:
+            with open("temp_uploaded_model.joblib", "wb") as f:
+                f.write(uploaded_model_file.getbuffer())
+            saved_obj = joblib.load("temp_uploaded_model.joblib")
+            st.success(f"Uploaded model loaded successfully: {uploaded_model_file.name}")
+        except Exception as e:
+            st.error(f"Failed to load uploaded model: {e}")
+    
+    # Extract model information
+    if 'saved_obj' in locals():
+        if isinstance(saved_obj, dict) and "pipeline" in saved_obj:
             loaded_model = saved_obj["pipeline"]
-            meta_metrics = saved_obj.get("metrics")     # dict of Accuracy, F1, etc.
-            le_classes = saved_obj.get("classes")       # LabelEncoder classes (if classification)
-
-            st.success("Model loaded successfully.")
-
-            if meta_metrics:
-                st.markdown("### Model Metrics (from training)")
-                st.json(meta_metrics)
-
-        except Exception as e:
-            st.error(f"Failed to load model: {e}")
-
-
-    # Load label encoder if available
-    le = st.session_state.get("label_encoder")
-
-    # --- Input Interface ---------------------------------------------------------
-    st.markdown("## Input Data")
-    mode = st.radio("Prediction Mode", ["Single Record", "Batch Upload"])
-    input_df = None
-
-    if mode == "Single Record":
-        if st.session_state.df is not None:
-            cols = list(st.session_state.df.dropna(axis=1).columns)
-            st.markdown("Fill values for one sample:")
-            values = {}
-            for col in cols:
-                val = st.text_input(f"{col}", value="")
-                values[col] = val
-
-            if st.button("Predict Single") and loaded_model:
-                try:
-                    row_df = pd.DataFrame([values])
-                    pred = loaded_model.predict(row_df)
-
-                    # Decode back if LabelEncoder exists
-                    if le is not None:
-                        pred = le.inverse_transform(pred)
-
-                    st.success(f"Prediction: **{pred[0]}**")
-
-                    # Probability/confidence scores if supported
-                    if hasattr(loaded_model, "predict_proba"):
-                        proba = loaded_model.predict_proba(row_df)
-                        if le is not None:
-                            proba_df = pd.DataFrame(proba, columns=[f"{cls} Prob" for cls in le.classes_])
-                        else:
-                            proba_df = pd.DataFrame(proba, columns=[f"Class {i}" for i in range(proba.shape[1])])
-
-                        # Highlight predicted class
-                        def highlight_pred(val, pred_class):
-                            return "background-color: yellow" if val == pred_class else ""
-
-                        st.write("Prediction Probabilities:")
-                        st.dataframe(
-                            proba_df.style.highlight_max(axis=1, color="yellow")
-                        )
-
-                    elif hasattr(loaded_model, "decision_function"):
-                        scores = loaded_model.decision_function(row_df)
-                        if scores.ndim == 1:
-                            scores = scores.reshape(1, -1)
-                        score_df = pd.DataFrame(scores, columns=[f"Score {i}" for i in range(scores.shape[1])])
-                        st.write("Decision Scores:")
-                        st.dataframe(score_df)
-
-                except Exception as e:
-                    st.error(f"Prediction failed: {e}")
+            meta_metrics = saved_obj.get("metrics")
+            target_classes = saved_obj.get("classes")
+            model_name = saved_obj.get("model_name", "Unknown Model")
+            task_type = saved_obj.get("task_type")
         else:
-            st.info("No dataset to infer feature columns. Upload dataset on Data Loading page.")
-
-    else:
-        batch_file = st.file_uploader("Upload batch file (CSV/Excel)", type=["csv","xlsx"])
-        if batch_file is not None:
-            try:
-                if batch_file.name.endswith(".csv"):
-                    input_df = pd.read_csv(batch_file)
-                else:
-                    input_df = pd.read_excel(batch_file)
-                st.write("Batch file loaded:", input_df.head())
-            except Exception as e:
-                st.error(f"Failed to load batch file: {e}")
-
-            if st.button("Predict Batch") and loaded_model and input_df is not None:
-                try:
-                    preds = loaded_model.predict(input_df)
-
-                    # Decode back if LabelEncoder exists
-                    if le is not None:
-                        preds = le.inverse_transform(preds)
-
-                    out_df = input_df.copy()
-                    out_df["Prediction"] = preds
-
-                    # Add probabilities/confidence if available
-                    if hasattr(loaded_model, "predict_proba"):
-                        proba = loaded_model.predict_proba(input_df)
-                        if le is not None:
-                            proba_df = pd.DataFrame(proba, columns=[f"{cls} Prob" for cls in le.classes_])
-                        else:
-                            proba_df = pd.DataFrame(proba, columns=[f"Class {i} Prob" for i in range(proba.shape[1])])
-                        out_df = pd.concat([out_df, proba_df], axis=1)
-
-                    elif hasattr(loaded_model, "decision_function"):
-                        scores = loaded_model.decision_function(input_df)
-                        if scores.ndim == 1:
-                            scores = scores.reshape(-1, 1)
-                        score_df = pd.DataFrame(scores, columns=[f"Score {i}" for i in range(scores.shape[1])])
-                        out_df = pd.concat([out_df, score_df], axis=1)
-
-                    st.dataframe(out_df.head())
-
-                    csv_bytes = out_df.to_csv(index=False).encode("utf-8")
-                    st.download_button("⬇️ Download Predictions CSV", data=csv_bytes, file_name="predictions.csv", mime="text/csv")
-                except Exception as e:
-                    st.error(f"Batch prediction failed: {e}")
-
-    st.markdown("---")
-
-    # --- Monitoring: Drift Detection ---------------------------------------------
-    st.markdown("## Drift Detection")
-    if st.session_state.df is not None and loaded_model is not None and input_df is not None:
-        try:
-            train_means = st.session_state.df.mean(numeric_only=True)
-            new_means = input_df.mean(numeric_only=True)
-            drift = (new_means - train_means) / (train_means.replace(0, np.nan))
-            st.write("Feature Drift (% change vs training means):")
-            st.dataframe(drift.to_frame("drift_ratio").style.format("{:.2%}"))
-        except Exception as e:
-            st.warning(f"Drift check failed: {e}")
-    else:
-        st.info("Load training dataset and new data to compare drift.")
-
-    st.markdown("---")
-
-    download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
-    st.warning("**Reminder:** Save your progress by downloading the dataset before closing. Do not rename the file if you plan to reload it later.")
-
-
-    ########################################
-    # Page 9 :  Auto ML
-    #######################################
-
-# elif page == "🧹 Clean + AutoML":
-#     clean_and_automl_page()
+            loaded_model = saved_obj
+            model_name = "Direct Pipeline"
         
+        st.info(f"Model: {model_name}")
+        st.info(f"Task Type: {task_type or 'Unknown'}")
+        
+        if meta_metrics:
+            st.markdown("### Model Performance Metrics")
+            metrics_df = pd.DataFrame.from_dict(meta_metrics, orient='index', columns=['Value'])
+            st.dataframe(metrics_df.style.format("{:.4f}"))
+
+    elif page == "Prediction":
+        st.header("Prediction")
+        ensure_session_state()
+        inject_css()
+
+        st.markdown("# Prediction")
+        st.caption("Load saved models and pipelines, perform batch or single-record inference, monitor drift.")
+
+        # --- Model Loader ---
+        # Initialize session state for current session models if not exists
+        if 'current_session_models' not in st.session_state:
+            st.session_state.current_session_models = []
+        
+        # Define current_date properly
+        current_date = datetime.now().strftime('%Y%m%d')
+        
+        # Get only models from current session (with timestamp from today)
+        current_session_models = [
+            f for f in glob.glob("*.joblib") + glob.glob("*.pkl") 
+            if not f.startswith('.') and current_date in f
+        ]
+        
+        # Also include the best model if it was created today
+        best_model = "best_model_pipeline.joblib"
+        if os.path.exists(best_model):
+            try:
+                creation_time = datetime.fromtimestamp(os.path.getctime(best_model))
+                if creation_time.strftime('%Y%m%d') == current_date:
+                    current_session_models.append(best_model)
+            except OSError:
+                pass  # File might not exist or other OS error
+        
+        # Update session state
+        st.session_state.current_session_models = current_session_models
+        
+        st.markdown("## Select Model")
+        
+        if not current_session_models:
+            st.warning("No trained models found from current session. Please train models on the Pipeline page first.")
+            st.info("💡 Models are only shown if they were created in the current session.")
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            selected_model_file = st.selectbox(
+                "Choose a trained model from current session",
+                options=[""] + current_session_models,
+                help="Only shows models created in the current session"
+            )
+        
+        with col2:
+            st.markdown("### Or load any model")
+            uploaded_model_file = st.file_uploader(
+                "Upload model file", 
+                type=["joblib", "pkl"],
+                help="Upload any .joblib or .pkl file"
+            )
+            # Show option to view all models
+            if st.checkbox("Show all models (not recommended)"):
+                all_models = [f for f in glob.glob("*.joblib") + glob.glob("*.pkl") if not f.startswith('.')]
+                if all_models:
+                    st.info("All available models:")
+                    for model in all_models:
+                        try:
+                            creation_time = datetime.fromtimestamp(os.path.getctime(model))
+                            st.write(f"• {model} (created: {creation_time.strftime('%Y-%m-%d %H:%M')})")
+                        except OSError:
+                            st.write(f"• {model} (creation time unavailable)")
+                else:
+                    st.write("No models found.")
+
+        # --- Load selected model ---
+        loaded_model, meta_metrics, target_classes, model_name, task_type = None, None, None, None, None
+        
+        if selected_model_file:
+            try:
+                saved_obj = joblib.load(selected_model_file)
+                st.success(f"Loaded model from: {selected_model_file}")
+                
+                # Show model creation time
+                try:
+                    creation_time = datetime.fromtimestamp(os.path.getctime(selected_model_file))
+                    st.caption(f"Model created: {creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                except OSError:
+                    st.caption("Creation time unavailable")
+                
+            except Exception as e:
+                st.error(f"Failed to load {selected_model_file}: {e}")
+        
+        elif uploaded_model_file:
+            try:
+                with open("temp_uploaded_model.joblib", "wb") as f:
+                    f.write(uploaded_model_file.getbuffer())
+                saved_obj = joblib.load("temp_uploaded_model.joblib")
+                st.success(f"Uploaded model loaded successfully: {uploaded_model_file.name}")
+            except Exception as e:
+                st.error(f"Failed to load uploaded model: {e}")
+        
+        # Extract model information
+        if 'saved_obj' in locals():
+            if isinstance(saved_obj, dict) and "pipeline" in saved_obj:
+                loaded_model = saved_obj["pipeline"]
+                meta_metrics = saved_obj.get("metrics")
+                target_classes = saved_obj.get("classes")
+                model_name = saved_obj.get("model_name", "Unknown Model")
+                task_type = saved_obj.get("task_type")
+            else:
+                loaded_model = saved_obj
+                model_name = "Direct Pipeline"
+            
+            st.info(f"Model: {model_name}")
+            st.info(f"Task Type: {task_type or 'Unknown'}")
+            
+            if meta_metrics:
+                st.markdown("### Model Performance Metrics")
+                metrics_df = pd.DataFrame.from_dict(meta_metrics, orient='index', columns=['Value'])
+                st.dataframe(metrics_df.style.format("{:.4f}"))
+
+        # --- Clear old models button ---
+        st.markdown("---")
+        st.markdown("### Model Management")
+        
+        if st.button("🔄 Clear All Models from Previous Sessions"):
+            all_models = glob.glob("*.joblib") + glob.glob("*.pkl")
+            models_deleted = 0
+            for model_file in all_models:
+                if not model_file.startswith('.'):
+                    try:
+                        # Check if model is from current session
+                        creation_time = datetime.fromtimestamp(os.path.getctime(model_file))
+                        if creation_time.strftime('%Y%m%d') != current_date:
+                            os.remove(model_file)
+                            models_deleted += 1
+                    except (OSError, FileNotFoundError):
+                        continue  # Skip if file doesn't exist or other OS error
+            
+            if models_deleted > 0:
+                st.success(f"Deleted {models_deleted} models from previous sessions")
+                st.rerun()
+            else:
+                st.info("No old models found to delete")
+
+    # --- Input Interface ---
+    if loaded_model:
+        st.markdown("## Input Data")
+        mode = st.radio("Prediction Mode", ["Single Record", "Batch Upload"])
+        
+        if mode == "Single Record":
+            if st.session_state.df is not None:
+                # Get feature columns from training data
+                feature_columns = st.session_state.df.columns.tolist()
+                
+                # Remove target column if it exists in session state
+                if hasattr(st.session_state, 'target_column') and st.session_state.target_column in feature_columns:
+                    feature_columns.remove(st.session_state.target_column)
+                
+                st.markdown("### Fill values for prediction:")
+                input_values = {}
+                
+                for col in feature_columns:
+                    col_data = st.session_state.df[col]
+                    
+                    # Determine input type based on column data
+                    if col_data.dtype == 'object' or col_data.nunique() < 20:
+                        # Categorical column - use dropdown
+                        unique_vals = col_data.dropna().unique().tolist()
+                        if len(unique_vals) > 0:
+                            default_val = unique_vals[0]
+                            input_val = st.selectbox(
+                                f"{col}",
+                                options=unique_vals,
+                                index=0,
+                                help=f"Select from available {col} values"
+                            )
+                        else:
+                            input_val = st.text_input(f"{col}", value="")
+                    elif pd.api.types.is_numeric_dtype(col_data):
+                        # Numeric column - use number input with free input
+                        # Show example value from training data as placeholder
+                        example_val = float(col_data.mean()) if not col_data.empty and not pd.isna(col_data.mean()) else 0.0
+                        input_val = st.number_input(
+                            f"{col}",
+                            value=example_val,
+                            step=0.1,
+                            help=f"Enter any numeric value for {col}"
+                        )
+                    elif pd.api.types.is_datetime64_any_dtype(col_data):
+                        # Date column - use date input
+                        min_date = col_data.min() if not col_data.empty else datetime.now().date()
+                        max_date = col_data.max() if not col_data.empty else datetime.now().date()
+                        input_val = st.date_input(f"{col}", value=min_date, min_value=min_date, max_value=max_date)
+                        input_val = input_val.isoformat()
+                    else:
+                        # Fallback to text input
+                        input_val = st.text_input(f"{col}", value="")
+                    
+                    input_values[col] = input_val
+
+                if st.button("Predict Single"):
+                    try:
+                        # Create DataFrame with proper data types
+                        row_df = pd.DataFrame([input_values])
+                        
+                        # Convert to appropriate data types based on training data
+                        for col in row_df.columns:
+                            if col in st.session_state.df.columns:
+                                if pd.api.types.is_numeric_dtype(st.session_state.df[col]):
+                                    row_df[col] = pd.to_numeric(row_df[col], errors='coerce')
+                                elif pd.api.types.is_datetime64_any_dtype(st.session_state.df[col]):
+                                    row_df[col] = pd.to_datetime(row_df[col], errors='coerce')
+                        
+                        # Make prediction
+                        pred = loaded_model.predict(row_df)
+                        
+                        # Decode prediction to class name if available
+                        if target_classes is not None and hasattr(pred, '__iter__'):
+                            try:
+                                pred_value = pred[0]
+                                if isinstance(pred_value, (int, float, np.number)):
+                                    pred_index = int(pred_value)
+                                    if 0 <= pred_index < len(target_classes):
+                                        prediction_display = target_classes[pred_index]
+                                    else:
+                                        prediction_display = str(pred_value)
+                                else:
+                                    prediction_display = str(pred_value)
+                            except (ValueError, IndexError, TypeError):
+                                prediction_display = str(pred[0])
+                        else:
+                            prediction_display = str(pred[0])
+                        
+                        # Display prediction with nice formatting
+                        st.success("### Prediction Result")
+                        st.markdown(f"**Predicted Value:** `{prediction_display}`")
+                        
+                        # Show probabilities if available
+                        if hasattr(loaded_model, "predict_proba"):
+                            proba = loaded_model.predict_proba(row_df)
+                            if target_classes is not None:
+                                proba_df = pd.DataFrame(proba, columns=target_classes)
+                            else:
+                                proba_df = pd.DataFrame(proba, columns=[f"Class {i}" for i in range(proba.shape[1])])
+                            
+                            st.markdown("### Prediction Probabilities")
+                            # Format probabilities as percentages
+                            proba_df_display = proba_df.copy()
+                            for col in proba_df_display.columns:
+                                proba_df_display[col] = proba_df_display[col].apply(lambda x: f"{x:.2%}")
+                            
+                            st.dataframe(proba_df_display.style.highlight_max(axis=1, color="lightgreen"))
+                            
+                            # Show probability distribution chart
+                            if len(proba_df.columns) > 1:
+                                fig = px.bar(
+                                    proba_df.T.reset_index(), 
+                                    x='index', 
+                                    y=0,
+                                    title="Prediction Probability Distribution",
+                                    labels={'index': 'Class', '0': 'Probability'}
+                                )
+                                fig.update_layout(yaxis_tickformat='.0%')
+                                st.plotly_chart(fig, use_container_width=True)
+
+                    except Exception as e:
+                        st.error(f"Prediction failed: {e}")
+                        st.error(f"Error details: {str(e)}")
+            else:
+                st.info("No dataset available to infer feature columns. Upload dataset on Data Loading page.")
+        
+        else:  # Batch mode
+            batch_file = st.file_uploader("Upload batch file (CSV/Excel)", type=["csv","xlsx"])
+            if batch_file is not None:
+                try:
+                    if batch_file.name.endswith(".csv"):
+                        input_df = pd.read_csv(batch_file)
+                    else:
+                        input_df = pd.read_excel(batch_file)
+                    st.write("Batch file preview:", input_df.head())
+                except Exception as e:
+                    st.error(f"Failed to load batch file: {e}")
+
+                if st.button("Predict Batch"):
+                    try:
+                        with st.spinner("Making predictions..."):
+                            preds = loaded_model.predict(input_df)
+                            
+                            # Decode predictions to class names if available
+                            if target_classes is not None:
+                                decoded_preds = []
+                                for pred in preds:
+                                    try:
+                                        if isinstance(pred, (int, float, np.number)):
+                                            pred_index = int(pred)
+                                            if 0 <= pred_index < len(target_classes):
+                                                decoded_preds.append(target_classes[pred_index])
+                                            else:
+                                                decoded_preds.append(str(pred))
+                                        else:
+                                            decoded_preds.append(str(pred))
+                                    except (ValueError, IndexError, TypeError):
+                                        decoded_preds.append(str(pred))
+                                preds = decoded_preds
+                            
+                            out_df = input_df.copy()
+                            out_df["Prediction"] = preds
+
+                            # Add probabilities if available
+                            if hasattr(loaded_model, "predict_proba"):
+                                proba = loaded_model.predict_proba(input_df)
+                                if target_classes is not None:
+                                    proba_df = pd.DataFrame(proba, columns=[f"Prob_{cls}" for cls in target_classes])
+                                else:
+                                    proba_df = pd.DataFrame(proba, columns=[f"Prob_Class_{i}" for i in range(proba.shape[1])])
+                                
+                                # Format probabilities as percentages
+                                for col in proba_df.columns:
+                                    proba_df[col] = proba_df[col].apply(lambda x: f"{x:.2%}")
+                                
+                                out_df = pd.concat([out_df, proba_df], axis=1)
+
+                            st.success(f"Predictions completed for {len(out_df)} records")
+                            st.dataframe(out_df.head())
+
+                            csv_bytes = out_df.to_csv(index=False).encode("utf-8")
+                            st.download_button(
+                                "⬇️ Download Predictions CSV", 
+                                data=csv_bytes, 
+                                file_name="predictions.csv", 
+                                mime="text/csv"
+                            )
+                            
+                    except Exception as e:
+                        st.error(f"Batch prediction failed: {e}")
+                        st.error(f"Error details: {str(e)}")
+    
+    else:
+        st.warning("Please load a trained model first.")
+
+    st.markdown("---")
+    st.warning("**Note:** Make sure your input data has the same features and data types as the training data.")

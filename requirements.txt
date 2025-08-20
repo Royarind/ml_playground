@@ -28,3 +28,5 @@ kaggle
 # NLP (optional but used)
 nltk
 statsmodels
+gunicorn==21.2.0
+python-dotenv==1.0.0

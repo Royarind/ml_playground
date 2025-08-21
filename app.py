@@ -166,14 +166,46 @@ def init_groq_client():
             st.session_state.groq_available = False
     
     return st.session_state.get('groq_client')
-def call_groq_llm(prompt, model="llama3-70b-8192", max_tokens=1024, temperature=0.7):
-    """Call Groq LLM API with the given prompt"""
-    client = init_groq_client()
-    if not client:
-        return "Groq API not available. Please set GROQ_API_KEY environment variable."
+def init_groq_client():
+    """Initialize Groq client with API key from environment or secrets"""
+    if not GROQ_AVAILABLE:
+        st.sidebar.warning("â ï¸ Groq library not available")
+        return None
+    
+    # Try to get API key from environment variable (production)
+    api_key = os.environ.get('GROQ_API_KEY')
+    
+    # If not found, try Streamlit secrets (development)
+    if not api_key:
+        try:
+            api_key = st.secrets.get('GROQ_API_KEY', '')
+        except:
+            api_key = ''
+    
+    # If still not found, show warning but don't crash
+    if not api_key:
+        st.sidebar.warning("â ï¸ Groq API key not configured")
+        st.session_state.groq_available = False
+        return None
+    
+    # Initialize client
+    if 'groq_client' not in st.session_state:
+        try:
+            st.session_state.groq_client = Groq(api_key=api_key)
+            st.session_state.groq_available = True
+            #st.sidebar.success("ð¤ Groq LLM Available")
+        except Exception as e:
+            st.error(f"Failed to initialize Groq client: {e}")
+            st.session_state.groq_available = False
+    
+    return st.session_state.get('groq_client')
+def call_groq_llm(prompt, model="llama3-70b-8192", max_tokens=1024, temperature=0.7, timeout=30):
+    """Call Groq LLM API with proper error handling and timeouts"""
+    if not GROQ_AVAILABLE:
+        return "Groq API not available. Please configure your API key."
     
     try:
-        chat_completion = client.chat.completions.create(
+        chat_completion = st.session_state.groq_client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model=model,
             temperature=temperature,
@@ -181,10 +213,23 @@ def call_groq_llm(prompt, model="llama3-70b-8192", max_tokens=1024, temperature=
             top_p=1,
             stream=False,
             stop=None,
+            timeout=timeout  # Add timeout
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
-        return f"Error calling Groq API: {str(e)}"
+        # More specific error handling
+        error_msg = str(e).lower()
+        
+        if "connection" in error_msg or "timeout" in error_msg:
+            return "Connection error: Unable to reach Groq servers. Please check your internet connection and try again."
+        elif "authentication" in error_msg or "invalid" in error_msg or "401" in error_msg:
+            return "Authentication error: Invalid API key. Please check your Groq API key."
+        elif "rate" in error_msg or "429" in error_msg:
+            return "Rate limit exceeded: Please wait a moment and try again."
+        elif "permission" in error_msg or "403" in error_msg:
+            return "Permission denied: Your API key may not have access to this model."
+        else:
+            return f"Error calling Groq API: {str(e)}"
 
 def groq_data_analysis(prompt_suffix, df, context=""):
     """Helper function to analyze data with Groq LLM"""

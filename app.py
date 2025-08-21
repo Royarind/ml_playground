@@ -12,6 +12,7 @@ import platform
 from typing import Optional, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
+import xgboost as xgb
 
 import numpy as np
 import pandas as pd
@@ -159,7 +160,7 @@ def init_groq_client():
         try:
             st.session_state.groq_client = Groq(api_key=api_key)
             st.session_state.groq_available = True
-            st.sidebar.success("ð¤ Groq LLM Available")
+            #st.sidebar.success("ð¤ Groq LLM Available")
         except Exception as e:
             st.error(f"Failed to initialize Groq client: {e}")
             st.session_state.groq_available = False
@@ -419,10 +420,10 @@ if page == "Home":
     
     # Initialize Groq
     init_groq_client()
-    if st.session_state.groq_available:
-        st.sidebar.success("🤖 Groq LLM Available")
-    else:
-        st.sidebar.warning("⚠️ Groq LLM Not Configured")
+    # if st.session_state.groq_available:
+    #     st.text.success("🤖 Groq LLM Available")
+    # else:
+    #     st.sidebar.warning("⚠️ Groq LLM Not Configured")
 
     # Step-by-step guide
     st.markdown("## Step-by-Step Workflow")
@@ -620,7 +621,7 @@ if page == "Home":
         
         # AI Assistant
         if st.session_state.groq_available:
-            with st.expander("🤖 AI Assistant"):
+            with st.expander("✅  AI Assistant"):
                 user_question = st.text_input("Ask a question about ML workflow:")
                 if user_question and st.button("Get AI Help"):
                     with st.spinner("Thinking..."):
@@ -894,7 +895,7 @@ elif page == "EDA":
     
     # ---------- AI analysis ----------
     if st.session_state.groq_available:
-        with st.expander("## AI-Powered Data Analysis", expanded=False):
+        with st.expander("✅ AI-Powered Data Analysis", expanded=False):
             analysis_type = st.selectbox("Analysis Type", 
                                        ["General Overview", "Data Quality", "Feature Suggestions", 
                                         "ML Readiness", "Custom Question"])

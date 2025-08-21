@@ -2,77 +2,83 @@
 
 from __future__ import annotations
 import io
-from typing import Optional, Tuple
-import pandas as pd
-import streamlit as st
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder as le
-#from clean_automl_page import clean_and_automl_page
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import os
-import joblib
-from datetime import datetime
-import matplotlib.pyplot as plt
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer, KNNImputer
-from sklearn.preprocessing import (
-    StandardScaler, MinMaxScaler, RobustScaler,
-    OneHotEncoder, OrdinalEncoder
-)
-from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier
-from sklearn.svm import SVC, SVR
-from sklearn.metrics import (
-    accuracy_score, f1_score, precision_score, recall_score, roc_auc_score,
-    confusion_matrix, ConfusionMatrixDisplay,
-    r2_score, mean_absolute_error, mean_squared_error
-)
-import xgboost as xgb
-import lightgbm as lgb
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import joblib
-import time
-import streamlit as st
-import pandas as pd
-import numpy as np
-import os
-import io
 import glob
 import zipfile
 import json
+import re
+import os
+import time
 import platform
+from typing import Optional, Tuple
 from datetime import datetime
 
+import numpy as np
+import pandas as pd
+import streamlit as st
+import matplotlib.pyplot as plt
+import seaborn as sns
+import joblib
+import shap
+import xgboost as xgb
+import lightgbm as lgb
+import optuna
+import plotly.express as px
+import plotly.graph_objects as go
+
+# Optional imports with try-except
 try:
     import pkg_resources
 except Exception:
     pkg_resources = None
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score, confusion_matrix,
-    roc_auc_score, roc_curve, precision_recall_curve, classification_report,
-    r2_score, mean_absolute_error, mean_squared_error
+
+# Scikit-learn imports
+from sklearn.model_selection import (
+    train_test_split, 
+    GridSearchCV, 
+    RandomizedSearchCV, 
+    cross_val_score
 )
-import shap
-import re
-import streamlit as st
-import plotly.express as px
-import plotly.graph_objects as go
-from sklearn.ensemble import IsolationForest
-import streamlit as st
-import joblib
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_score
-from sklearn.metrics import make_scorer, accuracy_score, f1_score, precision_score, recall_score, r2_score
-import optuna
+from sklearn.preprocessing import (
+    LabelEncoder,
+    StandardScaler, 
+    MinMaxScaler, 
+    RobustScaler,
+    OneHotEncoder, 
+    OrdinalEncoder
+)
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import (
+    LogisticRegression, 
+    LinearRegression, 
+    Ridge, 
+    Lasso
+)
+from sklearn.ensemble import (
+    RandomForestClassifier, 
+    RandomForestRegressor, 
+    GradientBoostingClassifier,
+    IsolationForest
+)
+from sklearn.svm import SVC, SVR
+from sklearn.metrics import (
+    accuracy_score, 
+    f1_score, 
+    precision_score, 
+    recall_score, 
+    roc_auc_score,
+    confusion_matrix, 
+    ConfusionMatrixDisplay,
+    r2_score, 
+    mean_absolute_error, 
+    mean_squared_error,
+    roc_curve, 
+    precision_recall_curve, 
+    classification_report,
+    make_scorer
+)
+
 from optuna.visualization import plot_optimization_history, plot_param_importances
 
 # Optional deps
@@ -129,17 +135,18 @@ page = st.sidebar.radio(
         "Final Evaluation",
         "Export",
         "Prediction",
-        #"Clean + AutoML"
     ]
 )
+
+#Session State
 
 def ensure_session_state():
     """Initialize expected keys in st.session_state."""
     ss = st.session_state
-    ss.setdefault("df", None)                 # current working dataset (canonical in-session)
-    ss.setdefault("versions", [])             # list of (name, df) tuples for quick reverts
-    ss.setdefault("dataset_name", None)       # friendly name for current df
-    ss.setdefault("notices", [])              # transient notices
+    ss.setdefault("df", None)                
+    ss.setdefault("versions", [])             
+    ss.setdefault("dataset_name", None)       
+    ss.setdefault("notices", [])             
 
 
 def inject_css():
@@ -174,7 +181,7 @@ def _read_dataframe_from_upload(file) -> pd.DataFrame:
     """Read CSV/Excel based on file name; robust to common encodings."""
     name = file.name.lower()
     if name.endswith((".csv", ".txt")):
-        # Try utf-8, fallback to latin-1
+        
         try:
             return pd.read_csv(file)
         except UnicodeDecodeError:
@@ -229,11 +236,7 @@ def load_sample_dataset(sample_key: str) -> Tuple[Optional[pd.DataFrame], Option
 
 
 def upload_panel(key_prefix: str = "home") -> Optional[pd.DataFrame]:
-    """Reusable upload panel: returns a DataFrame if a new dataset is chosen.
-
-    Supports single/multiple CSV/Excel uploads and sample datasets on Home.
-    Other sources (URL, Google Sheets, SQL, Kaggle) will be exposed on Data Loading page.
-    """
+    
     st.markdown("### Upload Data")
 
     tabs = st.tabs(["File", "Reminder"])
@@ -313,13 +316,13 @@ def preview_card(df: Optional[pd.DataFrame], name: Optional[str] = None):
     with st.expander("Column dtypes"):
         st.write(df.dtypes)
 
-# ========================= Home.py =========================
-# Landing page for the ML Playground. Save this as: Home.py
-###########################################################
+##############################################################
+# Page: 0 Landing page for the ML Playground. Has all the instructions
+##############################################################
 
 if page == "Home":
     st.title("ML Playground - Step by Step Guide")
-    st.write("Welcome to the Machine Learning Playground! Follow these steps to build, train, and deploy your ML models.")
+    st.write("Welcome to the Machine Learning Playground! Follow these steps to build, train, and download your ML models.")
     
     ensure_session_state()
     inject_css()
@@ -342,15 +345,15 @@ if page == "Home":
         **→ Go to:** **Data Loading** page in the sidebar
         """)
         
-        # Quick upload option on home page
-        st.markdown("---")
-        st.markdown("### Quick Start: Upload Your Data")
-        new_df = upload_panel(key_prefix="home")
-        if new_df is not None:
-            st.session_state.df = new_df
-            st.session_state.dataset_name = getattr(new_df, "_dataset_name", None) or "uploaded_or_sample"
-            st.session_state.versions.append(("loaded", new_df.copy()))
-            st.success("✅ Dataset loaded! You can now proceed to Step 2.")
+        # # Quick upload option on home page
+        # st.markdown("---")
+        # st.markdown("### Quick Start: Upload Your Data")
+        # new_df = upload_panel(key_prefix="home")
+        # if new_df is not None:
+        #     st.session_state.df = new_df
+        #     st.session_state.dataset_name = getattr(new_df, "_dataset_name", None) or "uploaded_or_sample"
+        #     st.session_state.versions.append(("loaded", new_df.copy()))
+        #     st.success("✅ Dataset loaded! You can now proceed to Step 2.")
 
     # Step 2: EDA
     with st.expander("Step 2: Explore & Clean Your Data"):
@@ -1439,10 +1442,10 @@ elif page == "Pipeline":
 
     selected_models = st.multiselect("Select Models to Train", list(models.keys()), default=list(models.keys())[:1])
 
-    trained_pipes = {}
-    results = {}
-
     if st.button("Train Models"):
+        trained_pipes = {}
+        results = {}
+        
         for name in selected_models:
             model = models[name]
             pipe = Pipeline([
@@ -1472,61 +1475,40 @@ elif page == "Pipeline":
 
             trained_pipes[name] = pipe
 
-        # Create results_df FIRST before using it
+        # Store models in session state instead of downloading
+        st.session_state.trained_models = trained_pipes
+        st.session_state.model_results = results
+        
+        # Create results display
         results_df = pd.DataFrame(results).T
         styled_df = results_df.style.highlight_max(axis=0, color="lightgreen")
         st.dataframe(styled_df)
-
-        # Save ALL trained models with descriptive filenames
-        for name, pipe in trained_pipes.items():
-            # Create safe filename (remove special characters)
-            safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
-            filename = f"model_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.joblib"
-            
-            joblib.dump({
-                "pipeline": pipe,
-                "metrics": results[name],
-                "task_type": task_type,
-                "classes": y_train.unique().tolist() if task_type=="classification" else None,
-                "model_name": name,
-                "training_date": datetime.now().isoformat()
-            }, filename)
-            
-            st.success(f"Saved {name} as {filename}")
-
-        # Also save the best model separately for convenience
+        
+        # Determine best model and store it
         if task_type == "classification":
             best_model_name = results_df["F1"].idxmax()
         else:
             best_model_name = results_df["R²"].idxmax()
-
-        best_pipe = trained_pipes[best_model_name]
-        best_metrics = results_df.loc[best_model_name].to_dict()
+            
+        st.session_state.best_model = {
+            "name": best_model_name,
+            "pipeline": trained_pipes[best_model_name],
+            "metrics": results_df.loc[best_model_name].to_dict()
+        }
         
-        joblib.dump({
-            "pipeline": best_pipe,
-            "metrics": best_metrics,
-            "task_type": task_type,
-            "classes": y_train.unique().tolist() if task_type=="classification" else None,
-            "model_name": f"BEST_{best_model_name}",
-            "training_date": datetime.now().isoformat()
-        }, "best_model_pipeline.joblib")
-        
-        st.success(f"Best model ({best_model_name}) saved as best_model_pipeline.joblib")
+        # Show success message but don't download automatically
+        st.success("Models trained successfully! Go to the Export page to download them.")
         
         # Show best model analysis
         st.markdown("### Best Model Analysis")
         st.write(f"Best model: **{best_model_name}**")
-        st.json(best_metrics)
-
+        st.json(st.session_state.best_model["metrics"])
 
 ##################################
 # Page 5: Training
 #################################
 # ========================= pages/5_Training.py =========================
 # Training Page for Hyperparameter Tuning, Cross-validation, Early Stopping with Visualizations
-
-
 
 elif page == "Training":
     st.header("Training")
@@ -1548,37 +1530,73 @@ elif page == "Training":
     X_train, X_test = splits["X_train"], splits["X_test"]
     y_train, y_test = splits["y_train"], splits["y_test"]
 
+    # Detect task type properly
+    def detect_task_type(y):
+        """Detect if the problem is classification or regression"""
+        if pd.api.types.is_numeric_dtype(y):
+            unique_values = y.nunique()
+            if unique_values <= 15 and all(val in range(int(unique_values)) for val in y.dropna().unique()):
+                return "classification"
+            else:
+                return "regression"
+        else:
+            return "classification"
+
+    task_type = detect_task_type(y_train)
+    st.info(f"Detected Task Type: **{task_type}**")
+
     # Load last trained pipelines if available
     trained_pipelines = {}
 
     st.markdown("## Hyperparameter Tuning")
     search_type = st.radio("Search Strategy", ["Grid Search", "Random Search", "Optuna"])
 
-    param_grid = st.text_area("Parameter Grid (dict format)", "{\n    'model__n_estimators': [50, 100],\n    'model__max_depth': [3, 5, None]\n}")
+    # Set appropriate default parameter grid based on task type
+    if task_type == "classification":
+        default_param_grid = {
+            'model__n_estimators': [50, 100, 200],
+            'model__max_depth': [3, 5, 10, None],
+            'model__min_samples_split': [2, 5, 10],
+            'model__class_weight': [None, 'balanced']
+        }
+        scoring_options = ["accuracy", "f1_weighted", "precision_weighted", "recall_weighted", "roc_auc"]
+    else:
+        default_param_grid = {
+            'model__n_estimators': [50, 100, 200],
+            'model__max_depth': [3, 5, 10, None],
+            'model__min_samples_split': [2, 5, 10],
+            'model__min_samples_leaf': [1, 2, 4]
+        }
+        scoring_options = ["r2", "neg_mean_squared_error", "neg_mean_absolute_error", "explained_variance"]
 
+    param_grid = st.text_area("Parameter Grid (dict format)", json.dumps(default_param_grid, indent=2))
     cv_folds = st.slider("Cross-validation folds", 2, 10, 5)
+    scoring_choice = st.selectbox("Scoring Metric", scoring_options, index=0)
 
-    # Early stopping toggle
+    # Early stopping toggle (only for certain models)
     use_early_stopping = st.checkbox("Use Early Stopping (for models that support it)", value=False)
-
-    # Custom scoring metric selection
-    scoring_choice = st.selectbox("Scoring Metric", [
-        "accuracy", "f1_weighted", "precision_weighted", "recall_weighted", "r2", "neg_mean_squared_error"
-    ], index=0)
 
     if st.button("Run Tuning"):
         try:
-            import ast
-            grid = ast.literal_eval(param_grid)
-        except Exception as e:
-            st.error(f"Invalid parameter grid: {e}")
+            param_dict = json.loads(param_grid)
+            
+            # Validate parameter grid matches task type
+            if task_type == "regression" and any('class_weight' in key for key in param_dict.keys()):
+                st.error("Error: 'class_weight' parameter is for classification only!")
+                st.stop()
+                
+        except json.JSONDecodeError:
+            st.error("Invalid JSON format for parameter grid")
             st.stop()
 
-        from sklearn.ensemble import RandomForestClassifier
-        from sklearn.pipeline import Pipeline
-        # Demo: placeholder, in practice use selected model & preprocessor from session_state
-        preprocessor = st.session_state.get("last_preprocessor")
+        # Use appropriate base model
+        if task_type == "classification":
+            base_model = RandomForestClassifier()
+        else:
+            base_model = RandomForestRegressor()
 
+        # Get preprocessor from session state or create default
+        preprocessor = st.session_state.get("last_preprocessor")
         if preprocessor is None:
             num_cols = X_train.select_dtypes(include=np.number).columns.tolist()
             cat_cols = X_train.select_dtypes(exclude=np.number).columns.tolist()
@@ -1591,26 +1609,27 @@ elif page == "Training":
                 ]
             )
 
-        model = RandomForestClassifier()
-        pipe = Pipeline([("preprocessor", preprocessor), ("model", model)])
+        pipe = Pipeline([("preprocessor", preprocessor), ("model", base_model)])
 
         if search_type == "Grid Search":
-            search = GridSearchCV(pipe, grid, cv=cv_folds, scoring=scoring_choice, n_jobs=-1, return_train_score=True)
+            search = GridSearchCV(pipe, param_dict, cv=cv_folds, scoring=scoring_choice, 
+                                 n_jobs=-1, return_train_score=True, error_score='raise')
             search.fit(X_train, y_train)
             st.success("Grid Search complete.")
             results_df = pd.DataFrame(search.cv_results_)
             st.dataframe(results_df[["params", "mean_test_score", "mean_train_score"]])
 
             # Heatmap if two hyperparameters
-            if len(grid.keys()) == 2:
-                keys = list(grid.keys())
+            if len(param_dict.keys()) == 2:
+                keys = list(param_dict.keys())
                 pivot = results_df.pivot(index=f"param_{keys[0]}", columns=f"param_{keys[1]}", values="mean_test_score")
                 fig, ax = plt.subplots()
                 sns.heatmap(pivot, annot=True, fmt=".3f", cmap="Blues", ax=ax)
                 st.pyplot(fig)
 
         elif search_type == "Random Search":
-            search = RandomizedSearchCV(pipe, grid, cv=cv_folds, n_iter=10, scoring=scoring_choice, n_jobs=-1, return_train_score=True)
+            search = RandomizedSearchCV(pipe, param_dict, cv=cv_folds, n_iter=10, 
+                                       scoring=scoring_choice, n_jobs=-1, return_train_score=True)
             search.fit(X_train, y_train)
             st.success("Random Search complete.")
             results_df = pd.DataFrame(search.cv_results_)
@@ -1625,7 +1644,12 @@ elif page == "Training":
             def objective(trial):
                 n_estimators = trial.suggest_int("model__n_estimators", 50, 200)
                 max_depth = trial.suggest_int("model__max_depth", 2, 20)
-                model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth)
+                
+                if task_type == "classification":
+                    model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth)
+                else:
+                    model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth)
+                    
                 pipe = Pipeline([("preprocessor", preprocessor), ("model", model)])
                 return cross_val_score(pipe, X_train, y_train, cv=cv_folds, scoring=scoring_choice).mean()
 
@@ -1647,9 +1671,132 @@ elif page == "Training":
             st.success("Best model pipeline saved as joblib.")
 
     st.markdown("---")
-
     download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
     st.warning("**Reminder:** Save your progress by downloading the dataset before closing. Do not rename the file if you plan to reload it later.")
+
+
+# elif page == "Training":
+#     st.header("Training")
+#     ensure_session_state()
+#     inject_css()
+
+#     st.markdown("# Model Training & Hyperparameter Tuning")
+#     st.caption("Tune models with grid/random/optuna search, apply cross-validation, early stopping, visualize results, and save.")
+
+#     if st.session_state.df is None:
+#         st.warning("No dataset loaded. Please upload and split data first.")
+#         st.stop()
+
+#     splits = st.session_state.get("split_result")
+#     if not splits:
+#         st.warning("Please perform Train-Test Split and build pipeline first.")
+#         st.stop()
+
+#     X_train, X_test = splits["X_train"], splits["X_test"]
+#     y_train, y_test = splits["y_train"], splits["y_test"]
+
+#     # Load last trained pipelines if available
+#     trained_pipelines = {}
+
+#     st.markdown("## Hyperparameter Tuning")
+#     search_type = st.radio("Search Strategy", ["Grid Search", "Random Search", "Optuna"])
+
+#     param_grid = st.text_area("Parameter Grid (dict format)", "{\n    'model__n_estimators': [50, 100],\n    'model__max_depth': [3, 5, None]\n}")
+
+#     cv_folds = st.slider("Cross-validation folds", 2, 10, 5)
+
+#     # Early stopping toggle
+#     use_early_stopping = st.checkbox("Use Early Stopping (for models that support it)", value=False)
+
+#     # Custom scoring metric selection
+#     scoring_choice = st.selectbox("Scoring Metric", [
+#         "accuracy", "f1_weighted", "precision_weighted", "recall_weighted", "r2", "neg_mean_squared_error"
+#     ], index=0)
+
+#     if st.button("Run Tuning"):
+#         try:
+#             import ast
+#             grid = ast.literal_eval(param_grid)
+#         except Exception as e:
+#             st.error(f"Invalid parameter grid: {e}")
+#             st.stop()
+
+#         from sklearn.ensemble import RandomForestClassifier
+#         from sklearn.pipeline import Pipeline
+#         # Demo: placeholder, in practice use selected model & preprocessor from session_state
+#         preprocessor = st.session_state.get("last_preprocessor")
+
+#         if preprocessor is None:
+#             num_cols = X_train.select_dtypes(include=np.number).columns.tolist()
+#             cat_cols = X_train.select_dtypes(exclude=np.number).columns.tolist()
+#             preprocessor = ColumnTransformer(
+#                 transformers=[
+#                     ("num", Pipeline([("imputer", SimpleImputer(strategy="median")),
+#                                     ("scaler", StandardScaler())]), num_cols),
+#                     ("cat", Pipeline([("imputer", SimpleImputer(strategy="most_frequent")),
+#                                     ("enc", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]), cat_cols),
+#                 ]
+#             )
+
+#         model = RandomForestClassifier()
+#         pipe = Pipeline([("preprocessor", preprocessor), ("model", model)])
+
+#         if search_type == "Grid Search":
+#             search = GridSearchCV(pipe, grid, cv=cv_folds, scoring=scoring_choice, n_jobs=-1, return_train_score=True)
+#             search.fit(X_train, y_train)
+#             st.success("Grid Search complete.")
+#             results_df = pd.DataFrame(search.cv_results_)
+#             st.dataframe(results_df[["params", "mean_test_score", "mean_train_score"]])
+
+#             # Heatmap if two hyperparameters
+#             if len(grid.keys()) == 2:
+#                 keys = list(grid.keys())
+#                 pivot = results_df.pivot(index=f"param_{keys[0]}", columns=f"param_{keys[1]}", values="mean_test_score")
+#                 fig, ax = plt.subplots()
+#                 sns.heatmap(pivot, annot=True, fmt=".3f", cmap="Blues", ax=ax)
+#                 st.pyplot(fig)
+
+#         elif search_type == "Random Search":
+#             search = RandomizedSearchCV(pipe, grid, cv=cv_folds, n_iter=10, scoring=scoring_choice, n_jobs=-1, return_train_score=True)
+#             search.fit(X_train, y_train)
+#             st.success("Random Search complete.")
+#             results_df = pd.DataFrame(search.cv_results_)
+#             st.dataframe(results_df[["params", "mean_test_score", "mean_train_score"]])
+
+#             # Lineplot of mean test scores
+#             fig, ax = plt.subplots()
+#             sns.lineplot(x=range(len(results_df)), y="mean_test_score", data=results_df, marker="o", ax=ax)
+#             st.pyplot(fig)
+
+#         else:  # Optuna
+#             def objective(trial):
+#                 n_estimators = trial.suggest_int("model__n_estimators", 50, 200)
+#                 max_depth = trial.suggest_int("model__max_depth", 2, 20)
+#                 model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth)
+#                 pipe = Pipeline([("preprocessor", preprocessor), ("model", model)])
+#                 return cross_val_score(pipe, X_train, y_train, cv=cv_folds, scoring=scoring_choice).mean()
+
+#             study = optuna.create_study(direction="maximize")
+#             study.optimize(objective, n_trials=15)
+#             st.write("Best params:", study.best_params)
+#             st.write("Best score:", study.best_value)
+
+#             # Optuna visualizations
+#             st.plotly_chart(plot_optimization_history(study))
+#             st.plotly_chart(plot_param_importances(study))
+
+#         if search_type in ["Grid Search", "Random Search"]:
+#             st.write("Best Parameters:", search.best_params_)
+#             st.write("Best CV Score:", search.best_score_)
+
+#             # Save tuned model
+#             joblib.dump(search.best_estimator_, "best_model_pipeline.joblib")
+#             st.success("Best model pipeline saved as joblib.")
+
+#     st.markdown("---")
+
+#     download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
+#     st.warning("**Reminder:** Save your progress by downloading the dataset before closing. Do not rename the file if you plan to reload it later.")
 
 #########################################
 # Page 6: Final Evaluation
@@ -1776,7 +1923,8 @@ elif page == "Final Evaluation":
 
     # Comparison table
     st.markdown("## Model Comparison")
-    st.dataframe(pd.DataFrame(results_summary).T)
+    st.write("Visit the Prediction page for a comprehensive model comparison.")
+    #st.dataframe(pd.DataFrame(results_summary).T)
 
     # SHAP values for the last model
     st.markdown("## Explainability (SHAP)")
@@ -1808,185 +1956,587 @@ elif page == "Final Evaluation":
 # ========================= pages/7_Download_Export.py =========================
 # Download / Export Page – bundle models, pipelines, datasets, reports, and metadata
 
-elif page == "Download / Export":
-    st.header("Download / Export")
+# elif page == "Download / Export":
+#     st.header("Download / Export")
 
+#     ensure_session_state()
+#     inject_css()
+
+#     st.markdown("# Download / Export")
+#     st.caption("Export models, pipelines, datasets, visualizations, reports, and reproducible bundles with metadata.")
+
+#     if st.session_state.df is None:
+#         st.warning("No dataset loaded. Please upload data first.")
+#         st.stop()
+
+#     # --- Discovery helpers --------------------------------------------------------
+#     @st.cache_data(show_spinner=False)
+#     def discover_artifacts():
+#         files = {}
+#         files["Models/Pipelines"] = sorted(glob.glob("*.joblib") + glob.glob("*.pkl"))
+#         files["Reports"] = sorted(glob.glob("*report*.csv") + glob.glob("*report*.html") + glob.glob("*profile*.html"))
+#         files["Visualizations"] = sorted(glob.glob("*.png") + glob.glob("*.jpg") + glob.glob("*.jpeg") + glob.glob("*.html"))
+#         files["SHAP"] = sorted(glob.glob("*shap*.png") + glob.glob("*shap*.html"))
+#         return files
+
+#     artifacts = discover_artifacts()
+
+#     # --- Project metadata ---------------------------------------------------------
+#     with st.expander("Bundle Metadata", expanded=True):
+#         colm1, colm2, colm3 = st.columns([1,1,1])
+#         with colm1:
+#             project_name = st.text_input("Project Name", value=st.session_state.get("dataset_name") or "ml_playground_project")
+#         with colm2:
+#             author = st.text_input("Author", value="user")
+#         with colm3:
+#             version = st.text_input("Version", value=datetime.now().strftime("%Y.%m.%d.%H%M"))
+
+#         notes = st.text_area("Release Notes / Comments", value="")
+
+#     # --- Dataset exports ----------------------------------------------------------
+#     st.markdown("## Dataset Exports")
+#     left, right = st.columns(2)
+#     with left:
+#         download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
+#     with right:
+#         splits = st.session_state.get("splits")
+#         if splits:
+#             st.markdown("**Train/Test/Val Splits**")
+#             for key in ["X_train","y_train","X_val","y_val","X_test","y_test"]:
+#                 if key in splits and splits[key] is not None:
+#                     obj = splits[key]
+#                     try:
+#                         csv_bytes = obj.to_csv(index=False).encode("utf-8")
+#                     except Exception:
+#                         # y can be Series
+#                         csv_bytes = pd.DataFrame(obj).to_csv(index=False).encode("utf-8")
+#                     st.download_button(
+#                         f"Download {key}.csv",
+#                         data=csv_bytes,
+#                         file_name=f"{project_name}_{key}.csv",
+#                         mime="text/csv",
+#                         key=f"dl_{key}"
+#                     )
+#         else:
+#             st.info("No saved splits found. Create them in ✂️ Train-Test Split page.")
+
+#     st.markdown("---")
+
+#     # --- Select artifacts to bundle ----------------------------------------------
+#     st.markdown("## Select Artifacts to Include in Bundle")
+#     selected_files = []
+#     for section, files in artifacts.items():
+#         if not files:
+#             continue
+#         st.markdown(f"**{section}**")
+#         cols = st.columns(3)
+#         for i, f in enumerate(files):
+#             with cols[i % 3]:
+#                 if st.checkbox(f, key=f"art_{f}"):
+#                     selected_files.append(f)
+
+#     # Allow user to add arbitrary files
+#     st.markdown("**Add other files by name (comma-separated, will include if they exist in working dir):**")
+#     other_files = st.text_input("Other file names", value="")
+#     if other_files.strip():
+#         for f in [x.strip() for x in other_files.split(",") if x.strip()]:
+#             if os.path.exists(f):
+#                 selected_files.append(f)
+#             else:
+#                 st.warning(f"File not found and skipped: {f}")
+
+#     # --- Build metadata / manifest -----------------------------------------------
+#     meta = {
+#         "project_name": project_name,
+#         "author": author,
+#         "version": version,
+#         "timestamp": datetime.utcnow().isoformat() + "Z",
+#         "platform": {
+#             "python_version": platform.python_version(),
+#             "system": platform.system(),
+#             "release": platform.release(),
+#         },
+#         "dataset": {
+#             "name": st.session_state.get("dataset_name") or "dataset",
+#             "shape": list(st.session_state.df.shape),
+#             "columns": list(st.session_state.df.columns),
+#         },
+#         "artifacts": selected_files,
+#         "notes": notes,
+#     }
+
+#     # Installed packages snapshot
+#     requirements_txt = ""
+#     if pkg_resources is not None:
+#         try:
+#             deps = sorted([f"{d.project_name}=={d.version}" for d in pkg_resources.working_set])
+#             meta["dependencies"] = deps
+#             requirements_txt = "\n".join(deps)
+#         except Exception:
+#             meta["dependencies"] = []
+#     else:
+#         meta["dependencies"] = []
+
+#     # --- Create ZIP bundle --------------------------------------------------------
+#     st.markdown("## Create Downloadable Bundle (.zip)")
+#     zip_name = st.text_input("Bundle file name", value=f"{project_name}_bundle_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+#     include_dataset_csv = st.checkbox("Include current dataset CSV", value=True)
+#     include_session_manifest = st.checkbox("Include session manifest (splits sizes, target guess)", value=True)
+#     include_requirements = st.checkbox("Include requirements.txt", value=True)
+
+#     if st.button("Build Bundle"):
+#         buffer = io.BytesIO()
+#         with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+#             # Add selected artifacts
+#             for path in selected_files:
+#                 try:
+#                     zf.write(path, arcname=os.path.join("artifacts", os.path.basename(path)))
+#                 except Exception as e:
+#                     st.error(f"Failed to add {path}: {e}")
+
+#             # Add dataset
+#             if include_dataset_csv:
+#                 csv_bytes = st.session_state.df.to_csv(index=False).encode("utf-8")
+#                 zf.writestr(f"data/{project_name}.csv", csv_bytes)
+
+#             # Add splits manifest
+#             if include_session_manifest:
+#                 splits = st.session_state.get("splits")
+#                 manifest = {"splits": {}}
+#                 if splits:
+#                     for key in ["X_train","y_train","X_val","y_val","X_test","y_test"]:
+#                         if key in splits and splits[key] is not None:
+#                             try:
+#                                 shape = list(splits[key].shape)
+#                             except Exception:
+#                                 shape = [len(splits[key])]
+#                             manifest["splits"][key] = {"shape": shape}
+#                 target_guess = None
+#                 if splits and "y_train" in splits:
+#                     target_guess = getattr(splits["y_train"], "name", None)
+#                 manifest["target_guess"] = target_guess
+#                 zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+
+#             # Add metadata
+#             zf.writestr("metadata.json", json.dumps(meta, indent=2))
+
+#             # Add requirements.txt
+#             if include_requirements and requirements_txt:
+#                 zf.writestr("requirements.txt", requirements_txt)
+
+#         buffer.seek(0)
+#         st.download_button(
+#             "⬇️ Download Bundle (.zip)",
+#             data=buffer.getvalue(),
+#             file_name=zip_name,
+#             mime="application/zip",
+#         )
+
+#     st.markdown("---")
+
+#     st.warning("**Reminder:** Save your progress by downloading the dataset before closing. Do not rename the file if you plan to reload it later.")
+
+#########################################
+# Page 7: Export
+#########################################
+
+elif page == "Export":
+    st.header("Export")
     ensure_session_state()
     inject_css()
 
-    st.markdown("# Download / Export")
-    st.caption("Export models, pipelines, datasets, visualizations, reports, and reproducible bundles with metadata.")
+    st.markdown("# Export Models & Project")
+    st.caption("Download trained models, preprocessing pipelines, datasets, and complete project bundles")
 
-    if st.session_state.df is None:
-        st.warning("No dataset loaded. Please upload data first.")
-        st.stop()
+    # Initialize session state for export settings
+    if 'export_settings' not in st.session_state:
+        st.session_state.export_settings = {
+            'include_data': True,
+            'include_splits': True,
+            'include_reports': True,
+            'include_requirements': True,
+        }
 
-    # --- Discovery helpers --------------------------------------------------------
-    @st.cache_data(show_spinner=False)
-    def discover_artifacts():
-        files = {}
-        files["Models/Pipelines"] = sorted(glob.glob("*.joblib") + glob.glob("*.pkl"))
-        files["Reports"] = sorted(glob.glob("*report*.csv") + glob.glob("*report*.html") + glob.glob("*profile*.html"))
-        files["Visualizations"] = sorted(glob.glob("*.png") + glob.glob("*.jpg") + glob.glob("*.jpeg") + glob.glob("*.html"))
-        files["SHAP"] = sorted(glob.glob("*shap*.png") + glob.glob("*shap*.html"))
-        return files
+    # Get current date for timestamping
+    current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    # --- Discover available models from session state ---
+    def get_available_models():
+        """Get models from session state"""
+        models = []
+        
+        # Get individual models
+        if 'trained_models' in st.session_state:
+            for name, pipeline in st.session_state.trained_models.items():
+                metrics = st.session_state.model_results.get(name, {})
+                models.append({
+                    'name': name,
+                    'pipeline': pipeline,
+                    'metrics': metrics,
+                    'is_best': False
+                })
+        
+        # Get best model
+        if 'best_model' in st.session_state:
+            best = st.session_state.best_model
+            models.append({
+                'name': f"BEST_{best['name']}",
+                'pipeline': best['pipeline'],
+                'metrics': best['metrics'],
+                'is_best': True
+            })
+            
+        return models
 
-    artifacts = discover_artifacts()
-
-    # --- Project metadata ---------------------------------------------------------
-    with st.expander("Bundle Metadata", expanded=True):
-        colm1, colm2, colm3 = st.columns([1,1,1])
-        with colm1:
-            project_name = st.text_input("Project Name", value=st.session_state.get("dataset_name") or "ml_playground_project")
-        with colm2:
-            author = st.text_input("Author", value="user")
-        with colm3:
-            version = st.text_input("Version", value=datetime.now().strftime("%Y.%m.%d.%H%M"))
-
-        notes = st.text_area("Release Notes / Comments", value="")
-
-    # --- Dataset exports ----------------------------------------------------------
-    st.markdown("## Dataset Exports")
-    left, right = st.columns(2)
-    with left:
-        download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
-    with right:
-        splits = st.session_state.get("splits")
-        if splits:
-            st.markdown("**Train/Test/Val Splits**")
-            for key in ["X_train","y_train","X_val","y_val","X_test","y_test"]:
-                if key in splits and splits[key] is not None:
-                    obj = splits[key]
-                    try:
-                        csv_bytes = obj.to_csv(index=False).encode("utf-8")
-                    except Exception:
-                        # y can be Series
-                        csv_bytes = pd.DataFrame(obj).to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        f"Download {key}.csv",
-                        data=csv_bytes,
-                        file_name=f"{project_name}_{key}.csv",
-                        mime="text/csv",
-                        key=f"dl_{key}"
-                    )
+    # Get available models
+    available_models = get_available_models()
+    
+    # Separate best model from others
+    best_models = [model for model in available_models if model['is_best']]
+    other_models = [model for model in available_models if not model['is_best']]
+    
+    # --- Export Options ---
+    st.markdown("## Export Options")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Content Selection")
+        include_data = st.checkbox("Include dataset", value=st.session_state.export_settings['include_data'])
+        include_splits = st.checkbox("Include train/test splits", value=st.session_state.export_settings['include_splits'])
+        include_reports = st.checkbox("Include reports", value=st.session_state.export_settings['include_reports'])
+        include_requirements = st.checkbox("Include requirements.txt", value=st.session_state.export_settings['include_requirements'])
+        
+    with col2:
+        st.markdown("### Model Selection")
+        
+        # Project metadata
+        project_name = st.text_input("Project name", value="ml_project")
+        version = st.text_input("Version", value=f"1.0_{current_date}")
+        
+        # Model selection
+        if other_models:
+            selected_model_names = st.multiselect(
+                "Select models to export",
+                options=[model['name'] for model in other_models],
+                default=[model['name'] for model in other_models]
+            )
+            
+            # Map back to actual model objects
+            selected_models = []
+            for name in selected_model_names:
+                for model in other_models:
+                    if model['name'] == name:
+                        selected_models.append(model)
+                        break
         else:
-            st.info("No saved splits found. Create them in ✂️ Train-Test Split page.")
+            st.info("No trained models found. Train models on the Pipeline page first.")
+            selected_models = []
 
-    st.markdown("---")
+    # Update session state
+    st.session_state.export_settings.update({
+        'include_data': include_data,
+        'include_splits': include_splits,
+        'include_reports': include_reports,
+        'include_requirements': include_requirements
+    })
 
-    # --- Select artifacts to bundle ----------------------------------------------
-    st.markdown("## Select Artifacts to Include in Bundle")
-    selected_files = []
-    for section, files in artifacts.items():
-        if not files:
-            continue
-        st.markdown(f"**{section}**")
-        cols = st.columns(3)
-        for i, f in enumerate(files):
+    # --- Individual Model Downloads ---
+    st.markdown("## Individual Model Downloads")
+    
+    if selected_models:
+        cols = st.columns(min(3, len(selected_models)))
+        
+        for i, model_info in enumerate(selected_models):
             with cols[i % 3]:
-                if st.checkbox(f, key=f"art_{f}"):
-                    selected_files.append(f)
-
-    # Allow user to add arbitrary files
-    st.markdown("**Add other files by name (comma-separated, will include if they exist in working dir):**")
-    other_files = st.text_input("Other file names", value="")
-    if other_files.strip():
-        for f in [x.strip() for x in other_files.split(",") if x.strip()]:
-            if os.path.exists(f):
-                selected_files.append(f)
-            else:
-                st.warning(f"File not found and skipped: {f}")
-
-    # --- Build metadata / manifest -----------------------------------------------
-    meta = {
-        "project_name": project_name,
-        "author": author,
-        "version": version,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "platform": {
-            "python_version": platform.python_version(),
-            "system": platform.system(),
-            "release": platform.release(),
-        },
-        "dataset": {
-            "name": st.session_state.get("dataset_name") or "dataset",
-            "shape": list(st.session_state.df.shape),
-            "columns": list(st.session_state.df.columns),
-        },
-        "artifacts": selected_files,
-        "notes": notes,
-    }
-
-    # Installed packages snapshot
-    requirements_txt = ""
-    if pkg_resources is not None:
-        try:
-            deps = sorted([f"{d.project_name}=={d.version}" for d in pkg_resources.working_set])
-            meta["dependencies"] = deps
-            requirements_txt = "\n".join(deps)
-        except Exception:
-            meta["dependencies"] = []
-    else:
-        meta["dependencies"] = []
-
-    # --- Create ZIP bundle --------------------------------------------------------
-    st.markdown("## Create Downloadable Bundle (.zip)")
-    zip_name = st.text_input("Bundle file name", value=f"{project_name}_bundle_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
-    include_dataset_csv = st.checkbox("Include current dataset CSV", value=True)
-    include_session_manifest = st.checkbox("Include session manifest (splits sizes, target guess)", value=True)
-    include_requirements = st.checkbox("Include requirements.txt", value=True)
-
-    if st.button("Build Bundle"):
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            # Add selected artifacts
-            for path in selected_files:
                 try:
-                    zf.write(path, arcname=os.path.join("artifacts", os.path.basename(path)))
+                    # Create model data for download
+                    model_data = {
+                        "pipeline": model_info['pipeline'],
+                        "metrics": model_info['metrics'],
+                        "model_name": model_info['name'],
+                        "training_date": datetime.now().isoformat()
+                    }
+                    
+                    # Convert to bytes
+                    model_bytes = io.BytesIO()
+                    joblib.dump(model_data, model_bytes)
+                    model_bytes.seek(0)
+                    
+                    # Create descriptive filename
+                    safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', model_info["name"])
+                    filename = f"{safe_name}_{current_date}.joblib"
+                    
+                    # Create download button
+                    st.download_button(
+                        label=f"Download {model_info['name']}",
+                        data=model_bytes.getvalue(),
+                        file_name=filename,
+                        mime="application/octet-stream",
+                        key=f"dl_{model_info['name']}"
+                    )
+                    
+                    # Show model info
+                    st.caption(f"Type: {type(model_info['pipeline']).__name__}")
+                    if model_info.get('metrics'):
+                        best_metric = next(iter(model_info['metrics'].values()), 'N/A')
+                        st.caption(f"Best: {best_metric:.4f}" if isinstance(best_metric, (int, float)) else f"Metric: {best_metric}")
+                
                 except Exception as e:
-                    st.error(f"Failed to add {path}: {e}")
+                    st.error(f"Error preparing {model_info['name']}: {e}")
+    else:
+        st.info("No models selected for individual download")
 
-            # Add dataset
-            if include_dataset_csv:
-                csv_bytes = st.session_state.df.to_csv(index=False).encode("utf-8")
-                zf.writestr(f"data/{project_name}.csv", csv_bytes)
+    # --- Best Model Download ---
+    st.markdown("## Best Model Download")
+    
+    if best_models:
+        for best_model_info in best_models:
+            try:
+                # Create model data for download
+                model_data = {
+                    "pipeline": best_model_info['pipeline'],
+                    "metrics": best_model_info['metrics'],
+                    "model_name": best_model_info['name'],
+                    "training_date": datetime.now().isoformat(),
+                    "is_best_model": True
+                }
+                
+                # Convert to bytes
+                model_bytes = io.BytesIO()
+                joblib.dump(model_data, model_bytes)
+                model_bytes.seek(0)
+                
+                # Create filename
+                safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', best_model_info["name"])
+                filename = f"{safe_name}_{current_date}.joblib"
+                
+                st.download_button(
+                    label=f"Download Best Model ({best_model_info['name']})",
+                    data=model_bytes.getvalue(),
+                    file_name=filename,
+                    mime="application/octet-stream",
+                    key=f"dl_best_{best_model_info['name']}"
+                )
+                
+                # Show metrics if available
+                if best_model_info.get('metrics'):
+                    metrics_df = pd.DataFrame.from_dict(best_model_info['metrics'], orient='index', columns=['Value'])
+                    st.dataframe(metrics_df.style.format("{:.4f}"))
+                
+                # Add some spacing between multiple best models
+                st.markdown("---")
+                    
+            except Exception as e:
+                st.error(f"Error preparing best model {best_model_info['name']}: {e}")
+    else:
+        st.info("No best model found. Train models first to generate a best model.")
 
-            # Add splits manifest
-            if include_session_manifest:
-                splits = st.session_state.get("splits")
-                manifest = {"splits": {}}
-                if splits:
-                    for key in ["X_train","y_train","X_val","y_val","X_test","y_test"]:
-                        if key in splits and splits[key] is not None:
-                            try:
-                                shape = list(splits[key].shape)
-                            except Exception:
-                                shape = [len(splits[key])]
-                            manifest["splits"][key] = {"shape": shape}
-                target_guess = None
-                if splits and "y_train" in splits:
-                    target_guess = getattr(splits["y_train"], "name", None)
-                manifest["target_guess"] = target_guess
-                zf.writestr("manifest.json", json.dumps(manifest, indent=2))
-
-            # Add metadata
-            zf.writestr("metadata.json", json.dumps(meta, indent=2))
-
-            # Add requirements.txt
-            if include_requirements and requirements_txt:
-                zf.writestr("requirements.txt", requirements_txt)
-
-        buffer.seek(0)
+    # --- All Models Bundle ---
+    st.markdown("## All Models Bundle")
+    
+    if selected_models or best_models:
+        bundle_filename = f"{project_name}_models_{current_date}.zip"
+        
+        # Create ZIP in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Add selected models
+            for model_info in selected_models:
+                try:
+                    # Create model data
+                    model_data = {
+                        "pipeline": model_info['pipeline'],
+                        "metrics": model_info['metrics'],
+                        "model_name": model_info['name'],
+                        "training_date": datetime.now().isoformat()
+                    }
+                    
+                    # Add to zip
+                    model_bytes = io.BytesIO()
+                    joblib.dump(model_data, model_bytes)
+                    model_bytes.seek(0)
+                    
+                    zip_file.writestr(
+                        f"{model_info['name']}_{current_date}.joblib", 
+                        model_bytes.getvalue()
+                    )
+                    
+                    # Add metadata
+                    metadata = {
+                        'model_name': model_info['name'],
+                        'metrics': model_info.get('metrics', {}),
+                        'export_date': datetime.now().isoformat()
+                    }
+                    
+                    zip_file.writestr(
+                        f"{model_info['name']}_metadata.json", 
+                        json.dumps(metadata, indent=2)
+                    )
+                        
+                except Exception as e:
+                    st.warning(f"Could not add {model_info['name']} to bundle: {e}")
+            
+            # Add best models
+            for best_model_info in best_models:
+                try:
+                    # Create model data
+                    model_data = {
+                        "pipeline": best_model_info['pipeline'],
+                        "metrics": best_model_info['metrics'],
+                        "model_name": best_model_info['name'],
+                        "training_date": datetime.now().isoformat(),
+                        "is_best_model": True
+                    }
+                    
+                    # Add to zip
+                    model_bytes = io.BytesIO()
+                    joblib.dump(model_data, model_bytes)
+                    model_bytes.seek(0)
+                    
+                    zip_file.writestr(
+                        f"{best_model_info['name']}_{current_date}.joblib", 
+                        model_bytes.getvalue()
+                    )
+                    
+                    # Add metadata
+                    metadata = {
+                        'model_name': best_model_info['name'],
+                        'metrics': best_model_info.get('metrics', {}),
+                        'is_best_model': True,
+                        'export_date': datetime.now().isoformat()
+                    }
+                    
+                    zip_file.writestr(
+                        f"{best_model_info['name']}_metadata.json", 
+                        json.dumps(metadata, indent=2)
+                    )
+                        
+                except Exception as e:
+                    st.warning(f"Could not add best model {best_model_info['name']} to bundle: {e}")
+        
+        zip_buffer.seek(0)
+        
         st.download_button(
-            "⬇️ Download Bundle (.zip)",
-            data=buffer.getvalue(),
-            file_name=zip_name,
+            label="Download All Models as ZIP",
+            data=zip_buffer.getvalue(),
+            file_name=bundle_filename,
             mime="application/zip",
+            key="dl_all_models"
         )
+    else:
+        st.info("No models available for bundle")
+
+    # --- Complete Project Export ---
+    st.markdown("## Complete Project Export")
+    
+    # Collect all files to include
+    all_files_to_include = []
+    
+    # Add models
+    for model_info in selected_models + best_models:
+        # Create model data
+        model_data = {
+            "pipeline": model_info['pipeline'],
+            "metrics": model_info['metrics'],
+            "model_name": model_info['name'],
+            "training_date": datetime.now().isoformat(),
+            "is_best_model": model_info.get('is_best', False)
+        }
+        
+        # Convert to bytes
+        model_bytes = io.BytesIO()
+        joblib.dump(model_data, model_bytes)
+        model_bytes.seek(0)
+        
+        all_files_to_include.append((f"models/{model_info['name']}_{current_date}.joblib", model_bytes.getvalue()))
+    
+    # Add data if requested and available
+    if include_data and st.session_state.df is not None:
+        # Save current dataset
+        dataset_filename = f"{project_name}_dataset_{current_date}.csv"
+        csv_data = st.session_state.df.to_csv(index=False).encode('utf-8')
+        all_files_to_include.append((f"data/{dataset_filename}", csv_data))
+    
+    # Add splits if requested and available
+    if include_splits and "split_result" in st.session_state:
+        splits = st.session_state["split_result"]
+        for key in ["X_train", "y_train", "X_val", "y_val", "X_test", "y_test"]:
+            if key in splits and splits[key] is not None:
+                if isinstance(splits[key], pd.DataFrame):
+                    split_data = splits[key].to_csv(index=False).encode('utf-8')
+                else:
+                    split_data = splits[key].to_frame().to_csv(index=False).encode('utf-8')
+                all_files_to_include.append((f"splits/{key}.csv", split_data))
+    
+    # Create project metadata
+    project_metadata = {
+        'project_name': project_name,
+        'version': version,
+        'export_date': datetime.now().isoformat(),
+        'dataset_shape': list(st.session_state.df.shape) if st.session_state.df is not None else None,
+        'included_models': [model_info['name'] for model_info in selected_models + best_models],
+        'export_settings': st.session_state.export_settings
+    }
+    
+    if st.button("Create Complete Project Export"):
+        if not all_files_to_include:
+            st.warning("No files selected for export")
+        else:
+            with st.spinner("Creating project bundle..."):
+                # Create ZIP in memory
+                project_zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(project_zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    # Add all files
+                    for filename, data in all_files_to_include:
+                        zip_file.writestr(filename, data)
+                    
+                    # Add requirements if requested
+                    if include_requirements:
+                        try:
+                            import pkg_resources
+                            requirements = "\n".join(
+                                sorted([f"{pkg.project_name}=={pkg.version}" for pkg in pkg_resources.working_set])
+                            )
+                            zip_file.writestr("requirements.txt", requirements)
+                        except Exception as e:
+                            st.warning(f"Could not generate requirements.txt: {e}")
+                    
+                    # Add metadata
+                    zip_file.writestr(
+                        "project_metadata.json", 
+                        json.dumps(project_metadata, indent=2)
+                    )
+                
+                project_zip_buffer.seek(0)
+                zip_data = project_zip_buffer.getvalue()
+                
+                # Create download button
+                project_filename = f"{project_name}_complete_{current_date}.zip"
+                
+                st.download_button(
+                    label="Download Complete Project",
+                    data=zip_data,
+                    file_name=project_filename,
+                    mime="application/zip",
+                    key="dl_complete_project"
+                )
+                
+                st.success("Project bundle created successfully!")
+                
+                # Show summary
+                st.markdown("### Export Summary")
+                summary_data = {
+                    'Models': len(selected_models + best_models),
+                    'Dataset': 'Included' if include_data else 'Excluded',
+                    'Splits': 'Included' if include_splits else 'Excluded',
+                    'Requirements': 'Included' if include_requirements else 'Excluded',
+                    'Total Files': len(all_files_to_include) + (1 if include_requirements else 0) + 1  # +1 for metadata
+                }
+                st.table(pd.DataFrame.from_dict(summary_data, orient='index', columns=['Count']))
 
     st.markdown("---")
-
-    st.warning("**Reminder:** Save your progress by downloading the dataset before closing. Do not rename the file if you plan to reload it later.")
+    st.warning("**Note:** Always download your exported files before closing the application. Files are not preserved between sessions.")
 
 
 ###########################################
@@ -2001,21 +2551,105 @@ elif page == "Prediction":
     st.caption("Load saved models and pipelines, perform batch or single-record inference, monitor drift.")
 
     # --- Model Loader ---
+    # Get models from both session state and disk
     model_files = glob.glob("*.joblib") + glob.glob("*.pkl")
     model_files = [f for f in model_files if not f.startswith('.')]
     
-    st.markdown("## Select Model")
+    # Get current date for filtering
+    current_date = datetime.now().strftime('%Y%m%d')
     
-    if not model_files:
+    # Filter models from current session (created today)
+    current_session_models = []
+    for model_file in model_files:
+        try:
+            creation_time = datetime.fromtimestamp(os.path.getctime(model_file))
+            if creation_time.strftime('%Y%m%d') == current_date:
+                current_session_models.append(model_file)
+        except OSError:
+            # If we can't get creation time, include the file
+            current_session_models.append(model_file)
+    
+    # If no current session models, show all models
+    if not current_session_models:
+        current_session_models = model_files
+    
+    # Get models from session state
+    session_models = {}
+    if 'trained_models' in st.session_state:
+        for name, pipeline in st.session_state.trained_models.items():
+            metrics = st.session_state.model_results.get(name, {})
+            session_models[name] = {
+                'pipeline': pipeline,
+                'metrics': metrics,
+                'is_best': False,
+                'source': 'session'
+            }
+    
+    # Get best model from session state
+    if 'best_model' in st.session_state:
+        best = st.session_state.best_model
+        session_models[f"BEST_{best['name']}"] = {
+            'pipeline': best['pipeline'],
+            'metrics': best['metrics'],
+            'is_best': True,
+            'source': 'session'
+        }
+    
+    # Create model selection options
+    session_model_names = list(session_models.keys())
+    file_model_names = current_session_models
+    
+    st.markdown("## Model Selection")
+    
+    if not session_model_names and not file_model_names:
         st.warning("No trained models found. Please train models on the Pipeline page first.")
     
+    # --- Model Comparison Table ---
+    if session_model_names:
+        st.markdown("### Model Performance Comparison")
+        
+        # Create comparison table
+        comparison_data = []
+        for name, model_info in session_models.items():
+            row = {'Model': name}
+            row.update(model_info['metrics'])
+            row['Best'] = '✓' if model_info['is_best'] else ''
+            comparison_data.append(row)
+        
+        comparison_df = pd.DataFrame(comparison_data)
+        if not comparison_df.empty:
+            # Style the comparison table
+            styled_df = comparison_df.style.highlight_max(
+                subset=[col for col in comparison_df.columns if col not in ['Model', 'Best']], 
+                color='lightgreen'
+            ).highlight_min(
+                subset=[col for col in comparison_df.columns if col not in ['Model', 'Best']], 
+                color='lightcoral'
+            )
+            
+            st.dataframe(styled_df, use_container_width=True)
+    
+    # --- Model Selection Interface ---
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        selected_model_file = st.selectbox(
-            "Choose a trained model",
-            options=[""] + model_files,
-            help="Select from previously trained models"
+        # Create dropdown options
+        dropdown_options = []
+        
+        # Add session models first
+        if session_model_names:
+            dropdown_options.append("--- Session Models ---")
+            dropdown_options.extend(session_model_names)
+        
+        # Add file models
+        if file_model_names:
+            dropdown_options.append("--- Saved Model Files ---")
+            dropdown_options.extend(file_model_names)
+        
+        selected_model = st.selectbox(
+            "Choose a model for prediction",
+            options=dropdown_options,
+            help="Select from models in current session or saved model files"
         )
     
     with col2:
@@ -2023,18 +2657,98 @@ elif page == "Prediction":
         uploaded_model_file = st.file_uploader(
             "Upload model file", 
             type=["joblib", "pkl"],
-            help="Upload a .joblib or .pkl file from your computer"
+            help="Upload a .joblib or .pkl file from your computer",
+            key="prediction_upload"
         )
+
+    # Show option to view all models (not just current session)
+    if st.checkbox("Show all available model files"):
+        if model_files:
+            st.info("All available model files:")
+            for model in model_files:
+                try:
+                    creation_time = datetime.fromtimestamp(os.path.getctime(model))
+                    st.write(f"• {model} (created: {creation_time.strftime('%Y-%m-%d %H:%M')})")
+                except OSError:
+                    st.write(f"• {model} (creation time unavailable)")
+        else:
+            st.info("No model files found on disk.")
 
     # --- Load selected model ---
     loaded_model, meta_metrics, target_classes, model_name, task_type = None, None, None, None, None
     
-    if selected_model_file:
-        try:
-            saved_obj = joblib.load(selected_model_file)
-            st.success(f"Loaded model from: {selected_model_file}")
-        except Exception as e:
-            st.error(f"Failed to load {selected_model_file}: {e}")
+    if selected_model and selected_model not in ["--- Session Models ---", "--- Saved Model Files ---"]:
+        # Check if it's a session model
+        if selected_model in session_models:
+            model_info = session_models[selected_model]
+            loaded_model = model_info['pipeline']
+            meta_metrics = model_info['metrics']
+            model_name = selected_model
+            st.success(f"Loaded session model: {selected_model}")
+            
+            # Try to determine task type
+            if loaded_model and hasattr(loaded_model, 'predict'):
+                # Better task type detection
+                try:
+                    # Check if we have target information from session state
+                    if hasattr(st.session_state, 'target_column') and st.session_state.target_column in st.session_state.df.columns:
+                        y_sample = st.session_state.df[st.session_state.target_column]
+                        
+                        # More robust task detection
+                        if pd.api.types.is_numeric_dtype(y_sample):
+                            # For regression: many unique values, mostly numeric
+                            unique_ratio = y_sample.nunique() / len(y_sample)
+                            if unique_ratio > 0.5 or y_sample.nunique() > 20:
+                                task_type = "regression"
+                            else:
+                                # Could be classification with numeric labels
+                                task_type = "classification"
+                        else:
+                            # Non-numeric target is definitely classification
+                            task_type = "classification"
+                    else:
+                        # Fallback: use model's predict method signature or known model types
+                        model_type = str(type(loaded_model)).lower()
+                        if any(reg_keyword in model_type for reg_keyword in ['regressor', 'regression', 'linear', 'lasso', 'ridge']):
+                            task_type = "regression"
+                        elif any(clf_keyword in model_type for clf_keyword in ['classifier', 'classification', 'logistic']):
+                            task_type = "classification"
+                        else:
+                            # Final fallback: check if model has predict_proba (classification)
+                            if hasattr(loaded_model, "predict_proba"):
+                                task_type = "classification"
+                            else:
+                                task_type = "regression"  # Assume regression as default
+                except Exception as e:
+                    st.warning(f"Could not automatically determine task type: {e}")
+                    task_type = "unknown"
+                
+        else:
+            # It's a file model
+            try:
+                saved_obj = joblib.load(selected_model)
+                st.success(f"Loaded model from: {selected_model}")
+                
+                # Show model creation time
+                try:
+                    creation_time = datetime.fromtimestamp(os.path.getctime(selected_model))
+                    st.caption(f"Model created: {creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                except OSError:
+                    st.caption("Creation time unavailable")
+                
+                # Extract model information
+                if isinstance(saved_obj, dict) and "pipeline" in saved_obj:
+                    loaded_model = saved_obj["pipeline"]
+                    meta_metrics = saved_obj.get("metrics")
+                    target_classes = saved_obj.get("classes")
+                    model_name = saved_obj.get("model_name", "Unknown Model")
+                    task_type = saved_obj.get("task_type")
+                else:
+                    loaded_model = saved_obj
+                    model_name = "Direct Pipeline"
+                
+            except Exception as e:
+                st.error(f"Failed to load {selected_model}: {e}")
     
     elif uploaded_model_file:
         try:
@@ -2042,129 +2756,8 @@ elif page == "Prediction":
                 f.write(uploaded_model_file.getbuffer())
             saved_obj = joblib.load("temp_uploaded_model.joblib")
             st.success(f"Uploaded model loaded successfully: {uploaded_model_file.name}")
-        except Exception as e:
-            st.error(f"Failed to load uploaded model: {e}")
-    
-    # Extract model information
-    if 'saved_obj' in locals():
-        if isinstance(saved_obj, dict) and "pipeline" in saved_obj:
-            loaded_model = saved_obj["pipeline"]
-            meta_metrics = saved_obj.get("metrics")
-            target_classes = saved_obj.get("classes")
-            model_name = saved_obj.get("model_name", "Unknown Model")
-            task_type = saved_obj.get("task_type")
-        else:
-            loaded_model = saved_obj
-            model_name = "Direct Pipeline"
-        
-        st.info(f"Model: {model_name}")
-        st.info(f"Task Type: {task_type or 'Unknown'}")
-        
-        if meta_metrics:
-            st.markdown("### Model Performance Metrics")
-            metrics_df = pd.DataFrame.from_dict(meta_metrics, orient='index', columns=['Value'])
-            st.dataframe(metrics_df.style.format("{:.4f}"))
-
-    elif page == "Prediction":
-        st.header("Prediction")
-        ensure_session_state()
-        inject_css()
-
-        st.markdown("# Prediction")
-        st.caption("Load saved models and pipelines, perform batch or single-record inference, monitor drift.")
-
-        # --- Model Loader ---
-        # Initialize session state for current session models if not exists
-        if 'current_session_models' not in st.session_state:
-            st.session_state.current_session_models = []
-        
-        # Define current_date properly
-        current_date = datetime.now().strftime('%Y%m%d')
-        
-        # Get only models from current session (with timestamp from today)
-        current_session_models = [
-            f for f in glob.glob("*.joblib") + glob.glob("*.pkl") 
-            if not f.startswith('.') and current_date in f
-        ]
-        
-        # Also include the best model if it was created today
-        best_model = "best_model_pipeline.joblib"
-        if os.path.exists(best_model):
-            try:
-                creation_time = datetime.fromtimestamp(os.path.getctime(best_model))
-                if creation_time.strftime('%Y%m%d') == current_date:
-                    current_session_models.append(best_model)
-            except OSError:
-                pass  # File might not exist or other OS error
-        
-        # Update session state
-        st.session_state.current_session_models = current_session_models
-        
-        st.markdown("## Select Model")
-        
-        if not current_session_models:
-            st.warning("No trained models found from current session. Please train models on the Pipeline page first.")
-            st.info("💡 Models are only shown if they were created in the current session.")
-        
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            selected_model_file = st.selectbox(
-                "Choose a trained model from current session",
-                options=[""] + current_session_models,
-                help="Only shows models created in the current session"
-            )
-        
-        with col2:
-            st.markdown("### Or load any model")
-            uploaded_model_file = st.file_uploader(
-                "Upload model file", 
-                type=["joblib", "pkl"],
-                help="Upload any .joblib or .pkl file"
-            )
-            # Show option to view all models
-            if st.checkbox("Show all models (not recommended)"):
-                all_models = [f for f in glob.glob("*.joblib") + glob.glob("*.pkl") if not f.startswith('.')]
-                if all_models:
-                    st.info("All available models:")
-                    for model in all_models:
-                        try:
-                            creation_time = datetime.fromtimestamp(os.path.getctime(model))
-                            st.write(f"• {model} (created: {creation_time.strftime('%Y-%m-%d %H:%M')})")
-                        except OSError:
-                            st.write(f"• {model} (creation time unavailable)")
-                else:
-                    st.write("No models found.")
-
-        # --- Load selected model ---
-        loaded_model, meta_metrics, target_classes, model_name, task_type = None, None, None, None, None
-        
-        if selected_model_file:
-            try:
-                saved_obj = joblib.load(selected_model_file)
-                st.success(f"Loaded model from: {selected_model_file}")
-                
-                # Show model creation time
-                try:
-                    creation_time = datetime.fromtimestamp(os.path.getctime(selected_model_file))
-                    st.caption(f"Model created: {creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                except OSError:
-                    st.caption("Creation time unavailable")
-                
-            except Exception as e:
-                st.error(f"Failed to load {selected_model_file}: {e}")
-        
-        elif uploaded_model_file:
-            try:
-                with open("temp_uploaded_model.joblib", "wb") as f:
-                    f.write(uploaded_model_file.getbuffer())
-                saved_obj = joblib.load("temp_uploaded_model.joblib")
-                st.success(f"Uploaded model loaded successfully: {uploaded_model_file.name}")
-            except Exception as e:
-                st.error(f"Failed to load uploaded model: {e}")
-        
-        # Extract model information
-        if 'saved_obj' in locals():
+            
+            # Extract model information
             if isinstance(saved_obj, dict) and "pipeline" in saved_obj:
                 loaded_model = saved_obj["pipeline"]
                 meta_metrics = saved_obj.get("metrics")
@@ -2174,38 +2767,32 @@ elif page == "Prediction":
             else:
                 loaded_model = saved_obj
                 model_name = "Direct Pipeline"
+                
+        except Exception as e:
+            st.error(f"Failed to load uploaded model: {e}")
+    
+    # Display model information
+    if loaded_model:
+        st.markdown("### Model Information")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.info(f"**Name:** {model_name}")
+            st.info(f"**Type:** {type(loaded_model).__name__}")
             
-            st.info(f"Model: {model_name}")
-            st.info(f"Task Type: {task_type or 'Unknown'}")
-            
+        with col2:
+            if task_type:
+                st.info(f"**Task:** {task_type}")
             if meta_metrics:
-                st.markdown("### Model Performance Metrics")
+                best_metric = next(iter(meta_metrics.values()), 'N/A')
+                metric_text = f"{best_metric:.4f}" if isinstance(best_metric, (int, float)) else f"{best_metric}"
+                st.info(f"**Best Metric:** {metric_text}")
+        
+        # Show detailed metrics if available
+        if meta_metrics:
+            with st.expander("View Detailed Metrics"):
                 metrics_df = pd.DataFrame.from_dict(meta_metrics, orient='index', columns=['Value'])
                 st.dataframe(metrics_df.style.format("{:.4f}"))
-
-        # --- Clear old models button ---
-        st.markdown("---")
-        st.markdown("### Model Management")
-        
-        if st.button("🔄 Clear All Models from Previous Sessions"):
-            all_models = glob.glob("*.joblib") + glob.glob("*.pkl")
-            models_deleted = 0
-            for model_file in all_models:
-                if not model_file.startswith('.'):
-                    try:
-                        # Check if model is from current session
-                        creation_time = datetime.fromtimestamp(os.path.getctime(model_file))
-                        if creation_time.strftime('%Y%m%d') != current_date:
-                            os.remove(model_file)
-                            models_deleted += 1
-                    except (OSError, FileNotFoundError):
-                        continue  # Skip if file doesn't exist or other OS error
-            
-            if models_deleted > 0:
-                st.success(f"Deleted {models_deleted} models from previous sessions")
-                st.rerun()
-            else:
-                st.info("No old models found to delete")
 
     # --- Input Interface ---
     if loaded_model:
@@ -2237,10 +2824,11 @@ elif page == "Prediction":
                                 f"{col}",
                                 options=unique_vals,
                                 index=0,
-                                help=f"Select from available {col} values"
+                                help=f"Select from available {col} values",
+                                key=f"input_{col}"
                             )
                         else:
-                            input_val = st.text_input(f"{col}", value="")
+                            input_val = st.text_input(f"{col}", value="", key=f"input_{col}")
                     elif pd.api.types.is_numeric_dtype(col_data):
                         # Numeric column - use number input with free input
                         # Show example value from training data as placeholder
@@ -2249,17 +2837,18 @@ elif page == "Prediction":
                             f"{col}",
                             value=example_val,
                             step=0.1,
-                            help=f"Enter any numeric value for {col}"
+                            help=f"Enter any numeric value for {col}",
+                            key=f"input_{col}"
                         )
                     elif pd.api.types.is_datetime64_any_dtype(col_data):
                         # Date column - use date input
                         min_date = col_data.min() if not col_data.empty else datetime.now().date()
                         max_date = col_data.max() if not col_data.empty else datetime.now().date()
-                        input_val = st.date_input(f"{col}", value=min_date, min_value=min_date, max_value=max_date)
+                        input_val = st.date_input(f"{col}", value=min_date, min_value=min_date, max_value=max_date, key=f"input_{col}")
                         input_val = input_val.isoformat()
                     else:
                         # Fallback to text input
-                        input_val = st.text_input(f"{col}", value="")
+                        input_val = st.text_input(f"{col}", value="", key=f"input_{col}")
                     
                     input_values[col] = input_val
 
@@ -2335,7 +2924,7 @@ elif page == "Prediction":
                 st.info("No dataset available to infer feature columns. Upload dataset on Data Loading page.")
         
         else:  # Batch mode
-            batch_file = st.file_uploader("Upload batch file (CSV/Excel)", type=["csv","xlsx"])
+            batch_file = st.file_uploader("Upload batch file (CSV/Excel)", type=["csv","xlsx"], key="batch_upload")
             if batch_file is not None:
                 try:
                     if batch_file.name.endswith(".csv"):
@@ -2390,10 +2979,11 @@ elif page == "Prediction":
 
                             csv_bytes = out_df.to_csv(index=False).encode("utf-8")
                             st.download_button(
-                                "⬇️ Download Predictions CSV", 
+                                "📥 Download Predictions CSV", 
                                 data=csv_bytes, 
                                 file_name="predictions.csv", 
-                                mime="text/csv"
+                                mime="text/csv",
+                                key="download_predictions"
                             )
                             
                     except Exception as e:

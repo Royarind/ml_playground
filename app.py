@@ -11,6 +11,7 @@ import time
 import platform
 from typing import Optional, Tuple
 from datetime import datetime
+from dotenv import load_dotenv
 
 import numpy as np
 import pandas as pd
@@ -24,6 +25,13 @@ import lightgbm as lgb
 import optuna
 import plotly.express as px
 import plotly.graph_objects as go
+
+# Groq LLM integration
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
 
 # Optional imports with try-except
 try:
@@ -121,6 +129,82 @@ except Exception:  # pragma: no cover
 # Run ONCE at the very top
 st.set_page_config(page_title="ML Playground", layout="wide", page_icon="🤖")
 
+#load_dotenv()
+
+# Initialize Groq client
+def init_groq_client():
+    """Initialize Groq client with API key from environment or user input"""
+    if not GROQ_AVAILABLE:
+        return None
+    GROQ_API_KEY = "sk_a8vNuNJxbNCvZOl5MAQ6WGdyb3FYPIdxOADqLz5A5G2TGLhdk00u"
+    api_key = GROQ_API_KEY
+    if 'groq_client' not in st.session_state:
+        #api_key = os.environ.get('GROQ_API_KEY')
+        if not api_key:
+            # Try to get from secrets
+            try:
+                api_key = st.secrets.get('GROQ_API_KEY', '')
+            except:
+                api_key = ''
+        
+        if api_key:
+            try:
+                st.session_state.groq_client = Groq(api_key=api_key)
+                st.session_state.groq_available = True
+            except Exception as e:
+                st.error(f"Failed to initialize Groq client: {e}")
+                st.session_state.groq_available = False
+        else:
+            st.session_state.groq_available = False
+    
+    return st.session_state.get('groq_client')
+
+# LLM helper functions
+def call_groq_llm(prompt, model="llama3-70b-8192", max_tokens=1024, temperature=0.7):
+    """Call Groq LLM API with the given prompt"""
+    client = init_groq_client()
+    if not client:
+        return "Groq API not available. Please set GROQ_API_KEY environment variable."
+    
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=1,
+            stream=False,
+            stop=None,
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        return f"Error calling Groq API: {str(e)}"
+
+def groq_data_analysis(prompt_suffix, df, context=""):
+    """Helper function to analyze data with Groq LLM"""
+    if df is None:
+        return "No dataset available for analysis."
+    
+    base_prompt = f"""
+    You are a data scientist assistant. Analyze this dataset and provide helpful insights.
+    
+    Dataset shape: {df.shape}
+    Columns: {', '.join(df.columns.tolist())}
+    Sample data (first 3 rows):
+    {df.head(3).to_string()}
+    
+    Data types:
+    {df.dtypes.to_string()}
+    
+    {context}
+    
+    {prompt_suffix}
+    
+    Please provide a concise, helpful response focused on practical insights.
+    """
+    
+    return call_groq_llm(base_prompt)
+
 # Sidebar navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
@@ -147,6 +231,7 @@ def ensure_session_state():
     ss.setdefault("versions", [])             
     ss.setdefault("dataset_name", None)       
     ss.setdefault("notices", [])             
+    ss.setdefault("groq_available", GROQ_AVAILABLE)
 
 
 def inject_css():
@@ -326,9 +411,16 @@ if page == "Home":
     
     ensure_session_state()
     inject_css()
+    
+    # Initialize Groq
+    init_groq_client()
+    if st.session_state.groq_available:
+        st.sidebar.success("🤖 Groq LLM Available")
+    else:
+        st.sidebar.warning("⚠️ Groq LLM Not Configured")
 
     # Step-by-step guide
-    st.markdown("##Step-by-Step Workflow")
+    st.markdown("## Step-by-Step Workflow")
     
     # Step 1: Data Loading
     with st.expander("Step 1: Load Your Data", expanded=True):
@@ -345,15 +437,15 @@ if page == "Home":
         **→ Go to:** **Data Loading** page in the sidebar
         """)
         
-        # # Quick upload option on home page
-        # st.markdown("---")
-        # st.markdown("### Quick Start: Upload Your Data")
-        # new_df = upload_panel(key_prefix="home")
-        # if new_df is not None:
-        #     st.session_state.df = new_df
-        #     st.session_state.dataset_name = getattr(new_df, "_dataset_name", None) or "uploaded_or_sample"
-        #     st.session_state.versions.append(("loaded", new_df.copy()))
-        #     st.success("✅ Dataset loaded! You can now proceed to Step 2.")
+        # Quick upload option on home page
+        st.markdown("---")
+        st.markdown("### Quick Start: Upload Your Data")
+        new_df = upload_panel(key_prefix="home")
+        if new_df is not None:
+            st.session_state.df = new_df
+            st.session_state.dataset_name = getattr(new_df, "_dataset_name", None) or "uploaded_or_sample"
+            st.session_state.versions.append(("loaded", new_df.copy()))
+            st.success("✅ Dataset loaded! You can now proceed to Step 2.")
 
     # Step 2: EDA
     with st.expander("Step 2: Explore & Clean Your Data"):
@@ -466,7 +558,7 @@ if page == "Home":
 
     # Quick status dashboard
     st.markdown("---")
-    st.markdown("##Current Project Status")
+    st.markdown("## Current Project Status")
     
     col1, col2, col3 = st.columns(3)
     
@@ -500,7 +592,7 @@ if page == "Home":
 
     # Quick actions
     st.markdown("---")
-    st.markdown("##Quick Actions")
+    st.markdown("## Quick Actions")
     
     quick_col1, quick_col2, quick_col3 = st.columns(3)
     
@@ -520,6 +612,20 @@ if page == "Home":
         - Save your work frequently
         - Hover over options for tooltips
         """)
+        
+        # AI Assistant
+        if st.session_state.groq_available:
+            with st.expander("🤖 AI Assistant"):
+                user_question = st.text_input("Ask a question about ML workflow:")
+                if user_question and st.button("Get AI Help"):
+                    with st.spinner("Thinking..."):
+                        response = call_groq_llm(f"""
+                        You're an ML expert assistant. Answer this question about machine learning workflow:
+                        {user_question}
+                        
+                        Provide a concise, helpful response focused on practical advice.
+                        """)
+                        st.info(response)
 
     # Footer
     st.markdown("---")
@@ -534,10 +640,6 @@ if page == "Home":
 # Page 1: Data Loading
 ################################################
 
-# ========================= pages/1_Data_Loading.py =========================
-# Data Loading Page for ML Playground
-# Save this as: pages/1_Data_Loading.py
-
 elif page == "Data Loading":
     st.header("Data Loading")
     st.markdown("# Data Loading")
@@ -545,6 +647,7 @@ elif page == "Data Loading":
 
     ensure_session_state()
     inject_css()
+    init_groq_client()
 
     # Two-column layout
     left, right = st.columns([1, 1])
@@ -665,6 +768,21 @@ elif page == "Data Loading":
     # --- Preview & Download Panel ---
     with right:
         preview_card(st.session_state.df, st.session_state.get("dataset_name"))
+        
+        # AI Data Analysis
+        if st.session_state.df is not None and st.session_state.groq_available:
+            with st.expander("🤖 AI Data Analysis"):
+                if st.button("Analyze Dataset with AI"):
+                    with st.spinner("Analyzing your data..."):
+                        analysis = groq_data_analysis(
+                            "Provide a comprehensive analysis of this dataset including:\n"
+                            "1. Data quality assessment\n"
+                            "2. Potential issues or anomalies\n"
+                            "3. Suggested preprocessing steps\n"
+                            "4. Recommended ML approaches based on the data characteristics",
+                            st.session_state.df
+                        )
+                        st.info(analysis)
 
     st.markdown("---")
     download_panel(st.session_state.df, filename_basename=st.session_state.get("dataset_name") or "dataset")
@@ -679,6 +797,7 @@ elif page == "EDA":
     st.header("Exploratory Data Analysis")
     ensure_session_state()
     inject_css()
+    init_groq_client()
 
     st.markdown("# Exploratory Data Analysis")
     st.caption("Explore your dataset: summary, cleaning, outliers, text, datetime, visualizations, and full profiling.")
@@ -767,6 +886,33 @@ elif page == "EDA":
             fig.update_layout(title=title)
         fig.update_layout(legend_title_text=color or "Legend")
         return fig
+    
+    # ---------- AI analysis ----------
+    if st.session_state.groq_available:
+        with st.expander("## AI-Powered Data Analysis", expanded=False):
+            analysis_type = st.selectbox("Analysis Type", 
+                                       ["General Overview", "Data Quality", "Feature Suggestions", 
+                                        "ML Readiness", "Custom Question"])
+            
+            custom_question = ""
+            if analysis_type == "Custom Question":
+                custom_question = st.text_input("Ask a specific question about your data")
+            
+            if st.button("Run AI Analysis"):
+                with st.spinner("Analyzing data with AI..."):
+                    if analysis_type == "General Overview":
+                        prompt = "Provide a comprehensive overview of this dataset, including key characteristics, patterns, and potential insights."
+                    elif analysis_type == "Data Quality":
+                        prompt = "Analyze data quality issues including missing values, outliers, data type problems, and suggest cleaning steps."
+                    elif analysis_type == "Feature Suggestions":
+                        prompt = "Suggest new features that could be engineered from this data and explain their potential value."
+                    elif analysis_type == "ML Readiness":
+                        prompt = "Assess this dataset's readiness for machine learning and suggest appropriate algorithms and preprocessing steps."
+                    else:
+                        prompt = custom_question
+                    
+                    analysis = groq_data_analysis(prompt, df)
+                    st.info(analysis)
 
     # ---------- top summary ----------
 
@@ -795,6 +941,8 @@ elif page == "EDA":
 
         st.button("Snapshot current dataset for Before/After", on_click=snapshot_current, kwargs={"label": "overview"})
 
+        
+
     # ---------- combine/append/merge ----------
     with st.expander("Combine Datasets (append / merge)", expanded=False):
         tabs = st.tabs(["Append (rows)", "Merge (SQL-style)"])
@@ -810,395 +958,476 @@ elif page == "EDA":
                 if new_parts:
                     st.session_state[DF_KEY] = pd.concat([st.session_state[DF_KEY]] + new_parts, ignore_index=True)
                     st.success("Appended data.")
+                    st.success("Appended data.")
+                    st.rerun()
+
         with tabs[1]:
-            left_on = st.selectbox("Left key", [None] + df.columns.tolist())
-            right_on = st.text_input("Right key (name in uploaded file)")
-            how = st.selectbox("How", ["left","inner","right","outer"], index=0)
-            merge_file = st.file_uploader("Upload CSV/Excel to merge with", type=["csv","xlsx"], key="merge_file")
-            if merge_file and left_on and right_on and st.button("Merge now"):
-                other = pd.read_csv(merge_file) if merge_file.name.endswith(".csv") else pd.read_excel(merge_file)
-                st.session_state[DF_KEY] = st.session_state[DF_KEY].merge(other, left_on=left_on, right_on=right_on, how=how)
-                st.success("Merged into current dataset.")
-
-    # ---------- column ops ----------
-    with st.expander("Column Operations", expanded=False):
-        cols = df.columns.tolist()
-        c1, c2 = st.columns([1,1])
-        with c1:
-            drop_cols = st.multiselect("Drop columns", cols)
-            if st.button("Apply drop", key="drop_cols") and drop_cols:
-                st.session_state[DF_KEY] = st.session_state[DF_KEY].drop(columns=drop_cols)
-                st.success(f"Dropped: {drop_cols}")
-        with c2:
-            rn = st.text_input("Rename (old:new, comma-separated)", "")
-            if st.button("Apply rename") and rn.strip():
-                mapping = {}
-                for part in rn.split(","):
-                    try:
-                        old, new = part.split(":")
-                        mapping[old.strip()] = new.strip()
-                    except Exception:
-                        st.error(f"Bad pair: {part}")
-                if mapping:
-                    st.session_state[DF_KEY] = st.session_state[DF_KEY].rename(columns=mapping)
-                    st.success(f"Renamed: {mapping}")
-        st.markdown("---")
-        c3, c4 = st.columns([1,1])
-
-        with c3:
-            col_tc = st.selectbox("Change dtype column", [None] + cols)
-            dtype = st.selectbox("to", ["int","float","str","datetime"])
-            if col_tc and st.button("Convert", key="convert"):
+            st.info("Merge with another dataset using SQL-style joins")
+            merge_file = st.file_uploader("Upload dataset to merge", type=["csv","xlsx"])
+            if merge_file:
                 try:
-                    series = st.session_state[DF_KEY][col_tc]
-
-                    if dtype == "datetime":
-                        st.session_state[DF_KEY][col_tc] = pd.to_datetime(series, errors="coerce")
-
-                    elif dtype == "int":
-                        st.session_state[DF_KEY][col_tc] = pd.to_numeric(series, errors="coerce").astype("Int64")
-
-                    elif dtype == "float":
-                        st.session_state[DF_KEY][col_tc] = pd.to_numeric(series, errors="coerce")
-
-                    elif dtype == "str":
-                        st.session_state[DF_KEY][col_tc] = series.astype(str).fillna("<MISSING>")
-
-                    st.success(f"Converted {col_tc} → {dtype}")
-
+                    merge_df = pd.read_csv(merge_file) if merge_file.name.endswith(".csv") else pd.read_excel(merge_file)
+                    st.write("Merge dataset preview:", merge_df.head())
+                    
+                    join_type = st.selectbox("Join type", ["inner", "left", "right", "outer"])
+                    left_key = st.selectbox("Left key column", df.columns)
+                    right_key = st.selectbox("Right key column", merge_df.columns)
+                    
+                    if st.button("Perform Merge"):
+                        merged = pd.merge(df, merge_df, left_on=left_key, right_on=right_key, how=join_type)
+                        st.session_state[DF_KEY] = merged
+                        st.success(f"Merged dataset shape: {merged.shape}")
+                        st.rerun()
                 except Exception as e:
-                    st.error(f"Type conversion failed: {e}")
+                    st.error(f"Merge failed: {e}")
 
-        with c4:
-            query = st.text_input("Drop rows by condition (pandas.query)", "")
-            if st.button("Drop rows matching condition") and query:
-                try:
-                    idx = st.session_state[DF_KEY].query(query).index
-                    st.session_state[DF_KEY] = st.session_state[DF_KEY].drop(index=idx)
-                    st.success(f"Dropped {len(idx)} rows.")
-                except Exception as e:
-                    st.error(f"Query failed: {e}")
-
-    # ---------- datetime tools ----------
-    with st.expander("Datetime Features", expanded=False):
-        dt_col = st.selectbox("Datetime column", [None] + st.session_state[DF_KEY].select_dtypes(include=["datetime64[ns]","object"]).columns.tolist())
-        if dt_col and st.button("Parse to datetime"):
-            st.session_state[DF_KEY][dt_col] = pd.to_datetime(st.session_state[DF_KEY][dt_col], errors="coerce")
-        if dt_col:
-            add_year = st.checkbox("Add year", value=True)
-            add_month = st.checkbox("Add month")
-            add_day = st.checkbox("Add day")
-            add_wd = st.checkbox("Add weekday")
-            add_hour = st.checkbox("Add hour")
-            if st.button("Extract parts"):
-                s = pd.to_datetime(st.session_state[DF_KEY][dt_col], errors="coerce")
-                if add_year:  st.session_state[DF_KEY][f"{dt_col}_year"] = s.dt.year
-                if add_month: st.session_state[DF_KEY][f"{dt_col}_month"] = s.dt.month
-                if add_day:   st.session_state[DF_KEY][f"{dt_col}_day"] = s.dt.day
-                if add_wd:    st.session_state[DF_KEY][f"{dt_col}_weekday"] = s.dt.weekday
-                if add_hour:  st.session_state[DF_KEY][f"{dt_col}_hour"] = s.dt.hour
-                st.success("Extracted datetime parts.")
-
-    # ---------- missing values ----------
-    with st.expander("Missing Values", expanded=False):
-        method = st.selectbox("Strategy", ["None","Drop rows","Fill mean","Fill median","Fill mode","Fill 0"]) 
-        if method != "None" and st.button("Apply NA strategy"):
-            d = st.session_state[DF_KEY]
-            if method == "Drop rows":
-                st.session_state[DF_KEY] = d.dropna()
-            elif method == "Fill mean":
-                st.session_state[DF_KEY] = d.fillna(d.mean(numeric_only=True))
-            elif method == "Fill median":
-                st.session_state[DF_KEY] = d.fillna(d.median(numeric_only=True))
-            elif method == "Fill mode":
-                st.session_state[DF_KEY] = d.fillna(d.mode().iloc[0])
-            else:
-                st.session_state[DF_KEY] = d.fillna(0)
-            st.success(f"Applied: {method}")
-
-    # ---------- outliers ----------
-    with st.expander("Outlier Detection & Removal", expanded=False):
-        d = st.session_state[DF_KEY]
-        num_cols = d.select_dtypes(include=np.number).columns.tolist()
-        outlier_col = st.selectbox("Column", [None] + num_cols)
-        method = st.selectbox("Method", ["IQR","Z-score","MAD","IsolationForest"]) 
-        preview_only = st.checkbox("Preview (do not apply)", value=True)
-        if outlier_col and st.button("Detect / Remove"):
-            try:
-                mask = pd.Series(True, index=d.index)
-                s = d[outlier_col]
-                if method == "IQR":
-                    q1, q3 = s.quantile(0.25), s.quantile(0.75)
-                    iqr = q3 - q1
-                    mask = ~((s < (q1 - 1.5*iqr)) | (s > (q3 + 1.5*iqr)))
-                elif method == "Z-score":
-                    z = (s - s.mean())/s.std(ddof=0)
-                    mask = z.abs() < 3
-                elif method == "MAD":
-                    med = s.median()
-                    mad = (s - med).abs().median()
-                    if mad == 0:
-                        mask = pd.Series(True, index=d.index)
-                    else:
-                        mask = ((s - med).abs()/(1.4826*mad)) < 3.5
-                else:
-                    iso = IsolationForest(contamination=0.05, random_state=42)
-                    preds = iso.fit_predict(s.to_frame())
-                    mask = pd.Series(preds == 1, index=d.index)
-
-                removed = (~mask).sum()
-                st.info(f"Would remove {removed} rows ({removed/len(mask):.2%}).")
-                fig = px.box(d, y=outlier_col, points="outliers")
-                st.plotly_chart(fig, use_container_width=True)
-                if not preview_only:
-                    st.session_state[DF_KEY] = d[mask]
-                    st.success(f"Removed outliers: {removed} rows")
-            except Exception as e:
-                st.error(f"Outlier step failed: {e}")
-
-    # ---------- groupby + deletions ----------
-    with st.expander("GroupBy & Row Deletion by Groups", expanded=False):
-        d = st.session_state[DF_KEY]
-        cols = d.columns.tolist()
-
-        group_cols = st.multiselect("Group by columns", cols)
-
-        if group_cols:
-            # Compute group counts safely (keep junk / NaN / mixed types)
-            gb = (
-                d[group_cols]
-                .astype(str)       # force everything to string so junk isn’t dropped
-                .fillna("<MISSING>")
-                .groupby(group_cols, dropna=False)
-                .size()
-                .reset_index(name="count")
-            )
-
-            st.markdown("### Unique Groups and Counts")
-            selections = []
-
-            for i, row in gb.iterrows():
-                group_label = ", ".join([f"{c}={row[c]}" for c in group_cols])
-                count = row["count"]
-
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.write(f"{group_label} — {count} rows")
-                with col2:
-                    if st.checkbox("", key=f"delgrp_{i}"):
-                        selections.append(tuple(row[c] for c in group_cols))
-
-            # If groups selected, preview rows
-            if selections:
-                st.markdown("### Preview rows that will be deleted")
-                kdf = d[group_cols].astype(str).apply(tuple, axis=1)
-                preview = d[kdf.isin(selections)]
-                st.dataframe(preview, use_container_width=True)
-
-                # Confirm deletion
-                if st.button("Confirm Delete Selected Groups"):
-                    keep_mask = ~kdf.isin(selections)
-                    removed = (~keep_mask).sum()
-                    st.session_state[DF_KEY] = d[keep_mask]
-                    st.success(f"Deleted {removed} rows from {len(selections)} group(s).")
-
-
-
-    # ---------- text cleaning ----------
-    with st.expander("Text Cleaning", expanded=False):
-        d = st.session_state[DF_KEY]
-        text_cols = d.select_dtypes(include="object").columns.tolist()
-        if not text_cols:
-            st.info("No object/text columns detected.")
-        else:
-            col = st.selectbox("Text column", text_cols)
-            actions = st.multiselect("Choose actions", [
-                "lowercase","uppercase","remove_digits","remove_punct","strip_spaces",
-                "remove_phrases","remove_firstN","remove_lastN","keep_firstN","keep_lastN",
-                "min_token_len","stopwords","stemming","lemmatize"
-            ], default=["lowercase","strip_spaces"])
-            phrases = st.text_input("Phrases to remove (space-separated)", "")
-            N = st.number_input("N (for first/last ops)", min_value=0, value=0, step=1)
-            minlen = st.number_input("Min token length", min_value=0, value=0, step=1)
-            if st.button("Apply text cleaning"):
-                s = d[col].astype(str)
-                if "lowercase" in actions: s = s.str.lower()
-                if "uppercase" in actions: s = s.str.upper()
-                if "remove_digits" in actions: s = s.str.replace(r"\d+", "", regex=True)
-                if "remove_punct" in actions: s = s.str.replace(r"[\p{Punct}]", "", regex=True)
-                if "strip_spaces" in actions: s = s.str.strip()
-                if "remove_phrases" in actions and phrases:
-                    for ph in phrases.split():
-                        s = s.str.replace(re.escape(ph), "", regex=True)
-                if "remove_firstN" in actions and N>0:
-                    s = s.str.replace(rf"^(?:\S+\s+){{{N}}}", "", regex=True)
-                if "remove_lastN" in actions and N>0:
-                    s = s.str.replace(rf"(?:\s+\S+){{{N}}}$", "", regex=True)
-                if "keep_firstN" in actions and N>0:
-                    s = s.str.replace(rf"^((?:\S+\s+){{0,{N}}}\S*).*", r"\1", regex=True)
-                if "keep_lastN" in actions and N>0:
-                    s = s.str.replace(rf".*(?:\s+((?:\S+\s+){{0,{N-1}}}\S+))$", r"\1", regex=True) if N>0 else s
-                if "min_token_len" in actions and minlen>0:
-                    s = s.apply(lambda t: " ".join([w for w in t.split() if len(w)>=minlen]))
-                if "stopwords" in actions and nltk is not None:
-                    try:
-                        sw = set(stopwords.words("english"))
-                    except Exception:
-                        sw = set()
-                    s = s.apply(lambda t: " ".join([w for w in t.split() if w.lower() not in sw]))
-                if "stemming" in actions and SnowballStemmer is not None:
-                    stemmer = SnowballStemmer("english")
-                    s = s.apply(lambda t: " ".join(stemmer.stem(w) for w in t.split()))
-                if "lemmatize" in actions and WordNetLemmatizer is not None:
-                    lemm = WordNetLemmatizer()
-                    s = s.apply(lambda t: " ".join(lemm.lemmatize(w) for w in t.split()))
-                st.session_state[DF_KEY][col] = s
-                st.success("Applied text cleaning.")
-
-# Initialize session state for code if it doesn't exist
-    if 'custom_code' not in st.session_state:
-        st.session_state.custom_code = (
-            "# df is a pandas DataFrame\n"
-            "# Example: create a new column\n"
-            "df['total'] = df.select_dtypes(include='number').sum(axis=1)\n"
-            "result = df\n"
-    )
-
-    with st.expander("Custom Python (advanced)", expanded=False):
-            st.markdown(
-            "Write Python that transforms the DataFrame named **df**. "
-            "Set `result = df` to return your new DataFrame. "
-            "Nothing is applied until you click **Apply**."
-        )
-
-        # Use the session state value instead of a fixed default
-    code = st.text_area(
-        "Code",
-        value=st.session_state.custom_code,
-        height=200,
-        key="code_editor"  # Add a unique key
-    )
+    # ---------- data cleaning ----------
+    with st.expander("Data Cleaning", expanded=False):
+        tabs = st.tabs(["Missing Values", "Outliers", "Duplicates", "Data Types", "Text Cleaning"])
         
-    # Update session state when code changes
-    if code != st.session_state.custom_code:
-        st.session_state.custom_code = code
-
-    dry = st.checkbox("Dry-run preview (no apply)", value=True)
-
-    if st.button("Run code"):
-    # Safe namespace
-        env = {
-            "np": np,
-            "pd": pd,
-            "df": st.session_state[DF_KEY].copy(),
-            "result": None,
-        }
-        # restrict builtins
-        safe_builtin_names = ("abs", "min", "max", "len", "range", "sum",
-                            "enumerate", "zip", "sorted", "map", "filter", "all", "any")
-        builtins_dict = getattr(__builtins__, "__dict__", __builtins__)
-        safe_builtins = {k: builtins_dict[k] for k in safe_builtin_names}
-
-        try:
-            exec(compile(code, "<user_code>", "exec"), {"__builtins__": safe_builtins}, env)
-            res = env.get("result")
-
-            if isinstance(res, pd.DataFrame):
-                before_cols = set(st.session_state[DF_KEY].columns)
-                after_cols = set(res.columns)
-
-                st.info("🔍 Differences from current DataFrame:")
-                st.json({
-                    "rows_before": len(st.session_state[DF_KEY]),
-                    "rows_after": len(res),
-                    "added_cols": sorted(list(after_cols - before_cols)),
-                    "dropped_cols": sorted(list(before_cols - after_cols)),
-                })
-
-                st.dataframe(res.head(), use_container_width=True)
-
-                if not dry and st.button("Apply result to session"):
-                    st.session_state[DF_KEY] = res
-                    st.success("Applied custom transform.")
-
-                    # keep code history
-                    st.session_state.setdefault("_code_history", []).append(code)
-
-            else:
-                st.warning("Your code must set `result = <DataFrame>`. Nothing changed.")
-                st.write(f"Got object of type: {type(res)}")
-
-        except Exception as e:
-            st.error(f"Execution failed: {e}")
-
-
-    # ---------- visualizations (customisable + before/after) ----------
-    with st.expander("Visualizations (customisable, 2D/3D/Animated)", expanded=False):
-        d = st.session_state[DF_KEY]
-        cols = d.columns.tolist()
-        left, right = st.columns([1,2])
-        with left:
-            kind = st.selectbox("Chart type", [
-                "Histogram","Box","Violin","Scatter","Line","Area","Pie","Density 2D","Heatmap",
-                "3D Scatter","3D Surface","Animated Scatter","Animated Bar"
-            ])
-            x = st.selectbox("X", [None] + cols)
-            y = st.selectbox("Y", [None] + cols)
-            z = st.selectbox("Z (for 3D)", [None] + cols)
-            color = st.selectbox("Color", [None] + cols)
-            size = st.selectbox("Size", [None] + cols)
-            symbol = st.selectbox("Symbol", [None] + cols)
-            facet_row = st.selectbox("Facet row", [None] + cols)
-            facet_col = st.selectbox("Facet col", [None] + cols)
-            marginal_x = st.selectbox("Marginal X", [None, "histogram","violin","box","rug"], index=0)
-            marginal_y = st.selectbox("Marginal Y", [None, "histogram","violin","box","rug"], index=0)
-            trendline = st.selectbox("Trendline", [None, "ols", "lowess"], index=0 if sm is None else 1)
-            animation_frame = st.selectbox("Animation frame", [None] + cols)
-            template = st.selectbox("Theme", ["plotly","plotly_white","plotly_dark","ggplot2","seaborn","simple_white"])    
-            title = st.text_input("Title", "")
-            use_snapshot = st.checkbox("Show Before/After (use snapshot as Before)")
-        with right:
-            if st.button("Render chart"):
-                try:
-                    fig_after = make_chart(d, kind, x, y, z, color, size, symbol,
-                                        facet_row, facet_col, marginal_x, marginal_y,
-                                        trendline, animation_frame, template, title)
-                    if use_snapshot and st.session_state.eda_snapshot is not None:
-                        label, snap = st.session_state.eda_snapshot
-                        t1, t2 = st.tabs([f"Before — {label}", "After (current)"])
-                        with t1:
-                            fig_before = make_chart(snap, kind, x, y, z, color, size, symbol,
-                                                    facet_row, facet_col, marginal_x, marginal_y,
-                                                    trendline, animation_frame, template, f"Before: {title}")
-                            st.plotly_chart(fig_before, use_container_width=True)
-                        with t2:
-                            st.plotly_chart(fig_after, use_container_width=True)
+        with tabs[0]:  # Missing Values
+            st.subheader("Handle Missing Values")
+            missing_cols = df.columns[df.isna().any()].tolist()
+            
+            if missing_cols:
+                col = st.selectbox("Select column with missing values", missing_cols)
+                missing_count = df[col].isna().sum()
+                st.write(f"Missing values in {col}: {missing_count} ({missing_count/len(df)*100:.1f}%)")
+                
+                strategy = st.radio("Handling strategy", 
+                                  ["Drop rows", "Fill with mean/median", "Fill with mode", 
+                                   "Fill with custom value", "Interpolate", "KNN Imputation"])
+                
+                if strategy == "Drop rows":
+                    if st.button("Drop rows with missing values"):
+                        st.session_state[DF_KEY] = df.dropna(subset=[col])
+                        st.success(f"Dropped {missing_count} rows")
+                        
+                elif strategy == "Fill with mean/median":
+                    if df[col].dtype in ['int64', 'float64']:
+                        fill_val = st.selectbox("Fill with", ["mean", "median"])
+                        if st.button("Fill missing values"):
+                            fill_value = df[col].mean() if fill_val == "mean" else df[col].median()
+                            st.session_state[DF_KEY][col] = df[col].fillna(fill_value)
+                            st.success(f"Filled with {fill_val}: {fill_value:.2f}")
                     else:
-                        st.plotly_chart(fig_after, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Plot failed: {e}")
-
-        # ---------- automated profiling ----------
-    with st.expander("Automated Profiling (YData)", expanded=False):
-        if ProfileReport is None:
-            st.info("ydata-profiling not installed in this environment.")
-        else:
-            run = st.checkbox("Run profiling (can take time)")
-            if run:
+                        st.warning("Column must be numeric for mean/median imputation")
+                        
+                elif strategy == "Fill with mode":
+                    if st.button("Fill with mode"):
+                        mode_val = df[col].mode()[0] if not df[col].mode().empty else "UNKNOWN"
+                        st.session_state[DF_KEY][col] = df[col].fillna(mode_val)
+                        st.success(f"Filled with mode: {mode_val}")
+                        
+                elif strategy == "Fill with custom value":
+                    custom_val = st.text_input("Custom value to fill")
+                    if st.button("Fill with custom value"):
+                        st.session_state[DF_KEY][col] = df[col].fillna(custom_val)
+                        st.success(f"Filled with: {custom_val}")
+                        
+                elif strategy == "Interpolate":
+                    if df[col].dtype in ['int64', 'float64']:
+                        if st.button("Interpolate missing values"):
+                            st.session_state[DF_KEY][col] = df[col].interpolate()
+                            st.success("Applied interpolation")
+                    else:
+                        st.warning("Interpolation only works for numeric columns")
+                        
+                elif strategy == "KNN Imputation":
+                    if st.button("Apply KNN Imputation (nearest neighbors)"):
+                        from sklearn.impute import KNNImputer
+                        imputer = KNNImputer(n_neighbors=5)
+                        numeric_cols = df.select_dtypes(include=np.number).columns
+                        df_numeric = df[numeric_cols].copy()
+                        imputed = imputer.fit_transform(df_numeric)
+                        st.session_state[DF_KEY][numeric_cols] = imputed
+                        st.success("Applied KNN imputation to all numeric columns")
+            else:
+                st.success("No missing values found!")
+        
+        with tabs[1]:  # Outliers
+            st.subheader("Detect and Handle Outliers")
+            numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+            
+            if numeric_cols:
+                outlier_col = st.selectbox("Select numeric column for outlier detection", numeric_cols)
+                
+                # Outlier detection methods
+                method = st.radio("Outlier detection method", 
+                                ["IQR (Interquartile Range)", "Z-score", "Isolation Forest"])
+                
+                if method == "IQR (Interquartile Range)":
+                    Q1 = df[outlier_col].quantile(0.25)
+                    Q3 = df[outlier_col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - 1.5 * IQR
+                    upper_bound = Q3 + 1.5 * IQR
+                    outliers = df[(df[outlier_col] < lower_bound) | (df[outlier_col] > upper_bound)]
+                    
+                elif method == "Z-score":
+                    from scipy import stats
+                    z_scores = np.abs(stats.zscore(df[outlier_col].dropna()))
+                    outliers = df[z_scores > 3]
+                    
+                elif method == "Isolation Forest":
+                    from sklearn.ensemble import IsolationForest
+                    clf = IsolationForest(contamination=0.1, random_state=42)
+                    preds = clf.fit_predict(df[[outlier_col]].dropna())
+                    outliers = df[preds == -1]
+                
+                st.write(f"Detected {len(outliers)} potential outliers")
+                st.dataframe(outliers)
+                
+                # Outlier handling
+                if len(outliers) > 0:
+                    action = st.selectbox("Action on outliers", 
+                                        ["Show only", "Remove outliers", "Cap outliers", "Winsorize"])
+                    
+                    if action == "Remove outliers" and st.button("Remove Outliers"):
+                        if method == "IQR (Interquartile Range)":
+                            st.session_state[DF_KEY] = df[(df[outlier_col] >= lower_bound) & (df[outlier_col] <= upper_bound)]
+                        st.success(f"Removed {len(outliers)} outliers")
+                        
+                    elif action == "Cap outliers" and st.button("Cap Outliers"):
+                        if method == "IQR (Interquartile Range)":
+                            df_capped = df.copy()
+                            df_capped[outlier_col] = np.where(df_capped[outlier_col] < lower_bound, lower_bound, 
+                                                            np.where(df_capped[outlier_col] > upper_bound, upper_bound, 
+                                                                    df_capped[outlier_col]))
+                            st.session_state[DF_KEY] = df_capped
+                            st.success("Outliers capped to IQR bounds")
+            else:
+                st.info("No numeric columns for outlier detection")
+        
+        with tabs[2]:  # Duplicates
+            st.subheader("Handle Duplicate Rows")
+            duplicates = df.duplicated().sum()
+            st.write(f"Number of duplicate rows: {duplicates}")
+            
+            if duplicates > 0:
+                if st.button("Remove Duplicate Rows"):
+                    st.session_state[DF_KEY] = df.drop_duplicates()
+                    st.success(f"Removed {duplicates} duplicate rows")
+            else:
+                st.success("No duplicate rows found!")
+        
+        with tabs[3]:  # Data Types
+            st.subheader("Change Data Types")
+            col_to_convert = st.selectbox("Select column to convert", df.columns)
+            current_type = str(df[col_to_convert].dtype)
+            st.write(f"Current type: {current_type}")
+            
+            new_type = st.selectbox("Convert to", 
+                                  ["Keep as is", "numeric", "category", "datetime", "string"])
+            
+            if st.button("Convert Data Type") and new_type != "Keep as is":
                 try:
-                    profile = ProfileReport(st.session_state[DF_KEY], title="YData Profiling Report", explorative=True)
-                    html = profile.to_html()
-                    if components is not None:
-                        components.html(html, height=900, scrolling=True)
-                    # download button
-                    buf = io.BytesIO(html.encode("utf-8"))
-                    st.download_button("Download HTML report", data=buf.getvalue(), file_name="eda_profile_report.html", mime="text/html")
+                    if new_type == "numeric":
+                        st.session_state[DF_KEY][col_to_convert] = pd.to_numeric(df[col_to_convert], errors='coerce')
+                    elif new_type == "category":
+                        st.session_state[DF_KEY][col_to_convert] = df[col_to_convert].astype('category')
+                    elif new_type == "datetime":
+                        st.session_state[DF_KEY][col_to_convert] = pd.to_datetime(df[col_to_convert], errors='coerce')
+                    elif new_type == "string":
+                        st.session_state[DF_KEY][col_to_convert] = df[col_to_convert].astype('string')
+                    st.success(f"Converted {col_to_convert} to {new_type}")
                 except Exception as e:
-                    st.error(f"Profiling failed: {e}")
+                    st.error(f"Conversion failed: {e}")
+        
+        with tabs[4]:  # Text Cleaning
+            st.subheader("Text Data Cleaning")
+            text_cols = df.select_dtypes(include=['object', 'string']).columns.tolist()
+            
+            if text_cols:
+                text_col = st.selectbox("Select text column", text_cols)
+                st.write("Sample values:", df[text_col].head().tolist())
+                
+                operations = st.multiselect("Text cleaning operations",
+                                          ["Lowercase", "Remove punctuation", "Remove digits", 
+                                           "Remove extra spaces", "Remove stopwords", "Stemming"])
+                
+                if st.button("Apply Text Cleaning"):
+                    cleaned = df[text_col].copy()
+                    
+                    if "Lowercase" in operations:
+                        cleaned = cleaned.str.lower()
+                    
+                    if "Remove punctuation" in operations:
+                        cleaned = cleaned.str.replace(r'[^\w\s]', '', regex=True)
+                    
+                    if "Remove digits" in operations:
+                        cleaned = cleaned.str.replace(r'\d+', '', regex=True)
+                    
+                    if "Remove extra spaces" in operations:
+                        cleaned = cleaned.str.strip().str.replace(r'\s+', ' ', regex=True)
+                    
+                    if "Remove stopwords" in operations:
+                        try:
+                            import nltk
+                            nltk.download('stopwords', quiet=True)
+                            from nltk.corpus import stopwords
+                            stop_words = set(stopwords.words('english'))
+                            cleaned = cleaned.apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
+                        except:
+                            st.warning("NLTK not available for stopword removal")
+                    
+                    if "Stemming" in operations:
+                        try:
+                            from nltk.stem import PorterStemmer
+                            stemmer = PorterStemmer()
+                            cleaned = cleaned.apply(lambda x: ' '.join([stemmer.stem(word) for word in x.split()]))
+                        except:
+                            st.warning("NLTK not available for stemming")
+                    
+                    st.session_state[DF_KEY][text_col] = cleaned
+                    st.success("Applied text cleaning operations")
+                    st.write("Cleaned sample:", cleaned.head().tolist())
+            else:
+                st.info("No text columns found for cleaning")
 
+    # ---------- feature engineering ----------
+    with st.expander("Feature Engineering", expanded=False):
+        st.subheader("Create New Features")
+        
+        # Create new column from existing
+        col1, col2 = st.columns(2)
+        with col1:
+            new_col_name = st.text_input("New column name", "new_feature")
+        with col2:
+            operation = st.selectbox("Operation", 
+                                   ["Custom expression", "Binning", "One-hot encoding", 
+                                    "Date extraction", "Text length"])
+        
+        if operation == "Custom expression":
+            expr = st.text_input("Pandas expression (use df to reference dataframe)", "df['col1'] + df['col2']")
+            if st.button("Create Column") and expr:
+                try:
+                    # Safe evaluation
+                    allowed_globals = {'df': df, 'np': np, 'pd': pd}
+                    result = eval(expr, {"__builtins__": {}}, allowed_globals)
+                    st.session_state[DF_KEY][new_col_name] = result
+                    st.success(f"Created column '{new_col_name}'")
+                except Exception as e:
+                    st.error(f"Error in expression: {e}")
+        
+        elif operation == "Binning":
+            bin_col = st.selectbox("Column to bin", df.select_dtypes(include=np.number).columns.tolist())
+            bin_method = st.radio("Binning method", ["Equal width", "Equal frequency", "Custom bins"])
+            
+            if bin_method == "Equal width":
+                n_bins = st.slider("Number of bins", 2, 20, 5)
+                if st.button("Create Bins"):
+                    st.session_state[DF_KEY][new_col_name] = pd.cut(df[bin_col], bins=n_bins, labels=False)
+                    
+            elif bin_method == "Equal frequency":
+                n_bins = st.slider("Number of bins", 2, 20, 5)
+                if st.button("Create Bins"):
+                    st.session_state[DF_KEY][new_col_name] = pd.qcut(df[bin_col], q=n_bins, labels=False, duplicates='drop')
+                    
+            elif bin_method == "Custom bins":
+                bin_edges = st.text_input("Bin edges (comma separated)", "0,25,50,75,100")
+                if st.button("Create Bins"):
+                    edges = [float(x.strip()) for x in bin_edges.split(',')]
+                    st.session_state[DF_KEY][new_col_name] = pd.cut(df[bin_col], bins=edges, labels=False)
+        
+        elif operation == "One-hot encoding":
+            cat_col = st.selectbox("Categorical column", df.select_dtypes(exclude=np.number).columns.tolist())
+            if st.button("One-hot encode"):
+                dummies = pd.get_dummies(df[cat_col], prefix=cat_col)
+                st.session_state[DF_KEY] = pd.concat([df, dummies], axis=1)
+                st.success(f"Created {len(dummies.columns)} one-hot encoded columns")
+        
+        elif operation == "Date extraction":
+            date_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
+            if date_cols:
+                date_col = st.selectbox("Date column", date_cols)
+                extract = st.multiselect("Extract components", 
+                                       ["Year", "Month", "Day", "Dayofweek", "Quarter", "Is weekend"])
+                if st.button("Extract Date Components"):
+                    for comp in extract:
+                        if comp == "Year":
+                            st.session_state[DF_KEY][f"{date_col}_year"] = df[date_col].dt.year
+                        elif comp == "Month":
+                            st.session_state[DF_KEY][f"{date_col}_month"] = df[date_col].dt.month
+                        elif comp == "Day":
+                            st.session_state[DF_KEY][f"{date_col}_day"] = df[date_col].dt.day
+                        elif comp == "Dayofweek":
+                            st.session_state[DF_KEY][f"{date_col}_dayofweek"] = df[date_col].dt.dayofweek
+                        elif comp == "Quarter":
+                            st.session_state[DF_KEY][f"{date_col}_quarter"] = df[date_col].dt.quarter
+                        elif comp == "Is weekend":
+                            st.session_state[DF_KEY][f"{date_col}_is_weekend"] = df[date_col].dt.dayofweek.isin([5,6])
+                    st.success(f"Extracted {len(extract)} date components")
+            else:
+                st.info("No datetime columns found")
+        
+        elif operation == "Text length":
+            text_cols = df.select_dtypes(include=['object', 'string']).columns.tolist()
+            if text_cols:
+                text_col = st.selectbox("Text column", text_cols)
+                if st.button("Create Text Length Feature"):
+                    st.session_state[DF_KEY][new_col_name] = df[text_col].str.len()
+                    st.success("Created text length feature")
+
+    # ---------- visualization ----------
+    with st.expander("Data Visualization", expanded=False):
+        st.subheader("Interactive Visualizations")
+        
+        # Chart type selection
+        chart_type = st.selectbox("Chart Type", 
+                                ["Histogram", "Box", "Violin", "Scatter", "Line", "Area", 
+                                 "Pie", "Density 2D", "Heatmap", "3D Scatter", "3D Surface",
+                                 "Animated Scatter", "Animated Bar"])
+        
+        # Column selection based on chart type
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            x_axis = st.selectbox("X Axis", [None] + list(df.columns))
+        with col2:
+            y_axis = st.selectbox("Y Axis", [None] + list(df.columns)) if chart_type not in ["Histogram", "Pie"] else None
+        with col3:
+            z_axis = st.selectbox("Z Axis", [None] + list(df.columns)) if chart_type in ["3D Scatter", "3D Surface"] else None
+        
+        # Additional options
+        color_by = st.selectbox("Color by", [None] + list(df.columns))
+        size_by = st.selectbox("Size by", [None] + list(df.columns)) if chart_type in ["Scatter", "3D Scatter"] else None
+        
+        # Advanced options
+        with st.expander("Advanced Options"):
+            facet_col = st.selectbox("Facet Column", [None] + list(df.columns))
+            facet_row = st.selectbox("Facet Row", [None] + list(df.columns))
+            trendline = st.selectbox("Trendline", [None, "ols", "lowess"]) if chart_type == "Scatter" else None
+            animation_frame = st.selectbox("Animation Frame", [None] + list(df.columns)) if chart_type in ["Animated Scatter", "Animated Bar"] else None
+        
+        if st.button("Generate Chart"):
+            try:
+                fig = make_chart(
+                    df_=df,
+                    kind=chart_type,
+                    x=x_axis,
+                    y=y_axis,
+                    z=z_axis,
+                    color=color_by,
+                    size=size_by,
+                    facet_col=facet_col,
+                    facet_row=facet_row,
+                    trendline=trendline,
+                    animation_frame=animation_frame,
+                    title=f"{chart_type} of {x_axis} vs {y_axis}" if y_axis else f"{chart_type} of {x_axis}"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart generation failed: {e}")
+
+    # ---------- correlation analysis ----------
+    with st.expander("Correlation Analysis", expanded=False):
+        st.subheader("Correlation Matrix")
+        
+        numeric_df = df.select_dtypes(include=np.number)
+        if len(numeric_df.columns) > 1:
+            corr_method = st.radio("Correlation method", ["Pearson", "Spearman", "Kendall"])
+            
+            if corr_method == "Pearson":
+                corr_matrix = numeric_df.corr()
+            elif corr_method == "Spearman":
+                corr_matrix = numeric_df.corr(method='spearman')
+            else:
+                corr_matrix = numeric_df.corr(method='kendall')
+            
+            # Heatmap
+            fig = px.imshow(corr_matrix, text_auto=True, aspect="auto", 
+                          color_continuous_scale='RdBu_r', title=f"{corr_method} Correlation Matrix")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Find highly correlated pairs
+            st.subheader("Highly Correlated Features")
+            threshold = st.slider("Correlation threshold", 0.5, 1.0, 0.8, 0.05)
+            
+            high_corr = []
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i+1, len(corr_matrix.columns)):
+                    if abs(corr_matrix.iloc[i, j]) > threshold:
+                        high_corr.append((corr_matrix.columns[i], corr_matrix.columns[j], corr_matrix.iloc[i, j]))
+            
+            if high_corr:
+                high_corr_df = pd.DataFrame(high_corr, columns=['Feature 1', 'Feature 2', 'Correlation'])
+                st.dataframe(high_corr_df.sort_values('Correlation', ascending=False))
+            else:
+                st.info(f"No feature pairs with correlation > {threshold}")
+        else:
+            st.info("Need at least 2 numeric columns for correlation analysis")
+
+    # ---------- automated profiling ----------
+    with st.expander("Automated Data Profiling", expanded=False):
+        st.subheader("Generate Comprehensive Profile Report")
+        
+        if ProfileReport is None:
+            st.warning("ydata_profiling is not installed. Install with: pip install ydata-profiling")
+        else:
+            if st.button("Generate Profile Report"):
+                with st.spinner("Generating comprehensive profile report..."):
+                    profile = ProfileReport(df, title="Dataset Profile", explorative=True)
+                    
+                    # Save to HTML
+                    profile_file = "data_profile.html"
+                    profile.to_file(profile_file)
+                    
+                    # Display in Streamlit
+                    with open(profile_file, "r", encoding="utf-8") as f:
+                        html_content = f.read()
+                    
+                    components.html(html_content, height=800, scrolling=True)
+                    
+                    # Download button
+                    with open(profile_file, "rb") as f:
+                        st.download_button("Download Profile Report", f, file_name="data_profile.html")
+
+    # ---------- before/after comparison ----------
+    if st.session_state.eda_snapshot:
+        with st.expander("Before/After Comparison", expanded=False):
+            label, snapshot_df = st.session_state.eda_snapshot
+            st.subheader(f"Comparison: Current vs {label}")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Current Rows", df.shape[0])
+                st.metric("Current Columns", df.shape[1])
+                st.metric("Current Missing", df.isna().sum().sum())
+            with col2:
+                st.metric("Snapshot Rows", snapshot_df.shape[0], 
+                         delta=df.shape[0] - snapshot_df.shape[0])
+                st.metric("Snapshot Columns", snapshot_df.shape[1],
+                         delta=df.shape[1] - snapshot_df.shape[1])
+                st.metric("Snapshot Missing", snapshot_df.isna().sum().sum(),
+                         delta=df.isna().sum().sum() - snapshot_df.isna().sum().sum())
+            
+            # Show differences
+            if not df.equals(snapshot_df):
+                st.info("Datasets differ in content")
+            else:
+                st.success("No differences found")
+
+
+    # ---------- bottom actions ----------
     st.markdown("---")
-    download_panel(st.session_state[DF_KEY], filename_basename=st.session_state.get("dataset_name") or "dataset")
-    st.warning("**Reminder:** Save your progress by downloading the dataset before closing. Do not rename the file if you plan to reload it later.")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("Snapshot Current State"):
+            snapshot_current("manual_snapshot")
+    
+    with col2:
+        if st.button("Reset to Original"):
+            if st.session_state.versions:
+                original_df = st.session_state.versions[0][1]
+                st.session_state[DF_KEY] = original_df.copy()
+                st.success("Reset to original dataset")
+    
+    with col3:
+        download_panel(df, filename_basename="cleaned_dataset")
+
+    st.warning("**Note:** All changes are applied to the current session. Download your cleaned dataset to preserve changes.")
 
 ################################################
 # Page 3: Train-Test-Split

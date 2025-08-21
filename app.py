@@ -127,26 +127,27 @@ except Exception:  # pragma: no cover
     skdatasets = None
 
 # Run ONCE at the very top
-st.set_page_config(page_title="ML Playground", layout="wide", page_icon="🤖")
+st.set_page_config(page_title="ML Playground", layout="wide", page_icon="")
 
-#load_dotenv()
+load_dotenv()
 
 # Initialize Groq client
 def init_groq_client():
     """Initialize Groq client with API key from environment or user input"""
     if not GROQ_AVAILABLE:
         return None
-    GROQ_API_KEY = "sk_a8vNuNJxbNCvZOl5MAQ6WGdyb3FYPIdxOADqLz5A5G2TGLhdk00u"
-    api_key = GROQ_API_KEY
+    
+    # Try to get from Streamlit secrets first
+    try:
+        api_key = st.secrets.get('GROQ_API_KEY', '')
+    except:
+        api_key = ''
+    
+    # Fallback to hardcoded key if not in secrets
+    if not api_key:
+        api_key = "sk_a8vNuNJxbNCvZOl5MAQ6WGdyb3FYPIdxOADqLz5A5G2TGLhdk00u"
+    
     if 'groq_client' not in st.session_state:
-        #api_key = os.environ.get('GROQ_API_KEY')
-        if not api_key:
-            # Try to get from secrets
-            try:
-                api_key = st.secrets.get('GROQ_API_KEY', '')
-            except:
-                api_key = ''
-        
         if api_key:
             try:
                 st.session_state.groq_client = Groq(api_key=api_key)
@@ -158,7 +159,6 @@ def init_groq_client():
             st.session_state.groq_available = False
     
     return st.session_state.get('groq_client')
-
 # LLM helper functions
 def call_groq_llm(prompt, model="llama3-70b-8192", max_tokens=1024, temperature=0.7):
     """Call Groq LLM API with the given prompt"""

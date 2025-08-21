@@ -133,33 +133,38 @@ load_dotenv()
 
 # Initialize Groq client
 def init_groq_client():
-    """Initialize Groq client with API key from environment or user input"""
+    """Initialize Groq client with API key from environment or secrets"""
     if not GROQ_AVAILABLE:
+        st.sidebar.warning("â ï¸ Groq library not available")
         return None
     
-    # Try to get from Streamlit secrets first
-    try:
-        api_key = st.secrets.get('GROQ_API_KEY', '')
-    except:
-        api_key = ''
+    # Try to get API key from environment variable (production)
+    api_key = os.environ.get('GROQ_API_KEY')
     
-    # Fallback to hardcoded key if not in secrets
+    # If not found, try Streamlit secrets (development)
     if not api_key:
-        api_key = "sk_a8vNuNJxbNCvZOl5MAQ6WGdyb3FYPIdxOADqLz5A5G2TGLhdk00u"
+        try:
+            api_key = st.secrets.get('GROQ_API_KEY', '')
+        except:
+            api_key = ''
     
+    # If still not found, show warning but don't crash
+    if not api_key:
+        st.sidebar.warning("â ï¸ Groq API key not configured")
+        st.session_state.groq_available = False
+        return None
+    
+    # Initialize client
     if 'groq_client' not in st.session_state:
-        if api_key:
-            try:
-                st.session_state.groq_client = Groq(api_key=api_key)
-                st.session_state.groq_available = True
-            except Exception as e:
-                st.error(f"Failed to initialize Groq client: {e}")
-                st.session_state.groq_available = False
-        else:
+        try:
+            st.session_state.groq_client = Groq(api_key=api_key)
+            st.session_state.groq_available = True
+            st.sidebar.success("ð¤ Groq LLM Available")
+        except Exception as e:
+            st.error(f"Failed to initialize Groq client: {e}")
             st.session_state.groq_available = False
     
     return st.session_state.get('groq_client')
-# LLM helper functions
 def call_groq_llm(prompt, model="llama3-70b-8192", max_tokens=1024, temperature=0.7):
     """Call Groq LLM API with the given prompt"""
     client = init_groq_client()

@@ -130,7 +130,7 @@ except Exception:  # pragma: no cover
 # Run ONCE at the very top
 st.set_page_config(page_title="ML Playground", layout="wide", page_icon="")
 
-load_dotenv()
+#load_dotenv()
 
 # Initialize Groq client
 def init_groq_client():

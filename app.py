@@ -136,7 +136,7 @@ load_dotenv()
 def init_groq_client():
     """Initialize Groq client with API key from environment or secrets"""
     if not GROQ_AVAILABLE:
-        st.sidebar.warning("â ï¸ Groq library not available")
+        st.sidebar.warning("Groq library not available")
         return None
     
     # Try to get API key from environment variable (production)
@@ -150,10 +150,10 @@ def init_groq_client():
             api_key = ''
     
     # If still not found, show warning but don't crash
-    if not api_key:
-        st.sidebar.warning("â ï¸ Groq API key not configured")
-        st.session_state.groq_available = False
-        return None
+    # if not api_key:
+    #     st.sidebar.warning("â ï¸ Groq API key not configured")
+    #     st.session_state.groq_available = False
+    #     return None
     
     # Initialize client
     if 'groq_client' not in st.session_state:

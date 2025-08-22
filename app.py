@@ -774,38 +774,6 @@ if page == "Home":
         else:
             st.info("Best Model Pending")
             st.caption("Complete Step 6")
-
-    # Quick actions
-    st.markdown("---")
-    st.markdown("## Quick Actions")
-    
-    quick_col1, quick_col2, quick_col3 = st.columns(3)
-    
-    with quick_col1:
-        if st.session_state.df is not None:
-            st.markdown("### Data Preview")
-            st.dataframe(st.session_state.df.head(3))
-            st.caption(f"Target: {st.session_state.get('target_column', 'Not set')}")
-    
-    with quick_col2:
-        if st.session_state.df is not None:
-            st.markdown("### 💾 Download Options")
-            download_panel(st.session_state.df, 
-                         filename_basename=st.session_state.get("dataset_name") or "dataset")
-    
-    with quick_col3:
-        st.markdown("### Need Help?")
-        st.markdown("""
-        - Check each step's instructions above
-        - Use the AI Assistant chat for questions
-        - Hover over options for tooltips
-        - Save your work frequently with exports
-        
-        **Keyboard Shortcuts:**
-        - `r` - Refresh current page
-        - `s` - Save current state
-        - `a` - Open AI chat
-        """)
     
     # Footer
     st.markdown("---")

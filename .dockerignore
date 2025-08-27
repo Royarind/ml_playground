@@ -9,4 +9,5 @@ __pycache__/
 .venv/
 .git
 .env
+.streamlit/secrets.toml
 test2.py

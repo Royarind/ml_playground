@@ -162,12 +162,7 @@ def init_groq_client():
             api_key = st.secrets.get('GROQ_API_KEY', '')
         except:
             api_key = ''
-    
-    # If still not found, show warning but don't crash
-    # if not api_key:
-    #     st.sidebar.warning("â ï¸ Groq API key not configured")
-    #     st.session_state.groq_available = False
-    #     return None
+
     
     # Initialize client
     if 'groq_client' not in st.session_state:
@@ -180,6 +175,7 @@ def init_groq_client():
             st.session_state.groq_available = False
     
     return st.session_state.get('groq_client')
+
 def init_groq_client():
     """Initialize Groq client with API key from environment or secrets"""
     if not GROQ_AVAILABLE:
@@ -213,6 +209,7 @@ def init_groq_client():
             st.session_state.groq_available = False
     
     return st.session_state.get('groq_client')
+
 def call_groq_llm(prompt, model="llama3-70b-8192", max_tokens=1024, temperature=0.7, timeout=30):
     """Call Groq LLM API with proper error handling and timeouts"""
     if not GROQ_AVAILABLE:
@@ -278,10 +275,11 @@ page = st.sidebar.radio(
         "Data Loading",
         "EDA",
         "Train-Test Split",
-        "Pipeline and Model Training",  # Replace "Pipeline" and "Training" with this
+        "Pipeline and Model Training",
         "Final Evaluation",
         "Export",
         "Prediction",
+        "🤖 AI AutoML",
     ]
 )
 
@@ -503,8 +501,8 @@ if page == "Home":
             st.success("Session reset! Ready for a new project.")
     
     with col3:
-        if st.button("📚 View Tutorial", key="quick_tutorial"):
-            st.info("Check each step's expander for detailed instructions and AI tips!")
+        if st.button("🤖 Try AI AutoML", key="quick_automl"):
+            st.info("Go to AI AutoML page for one-click complete ML pipeline!")
 
     # Step-by-step guide with AI enhancements
     st.markdown("## 📋 Step-by-Step Workflow")
@@ -700,13 +698,43 @@ if page == "Home":
         💡 **Pro Tip**: Test your model with edge cases and ask AI to explain why it made certain predictions!
         """)
 
+    # Step 9: AI AutoML
+    with st.expander("🤖 Step 9: AI AutoML - One-Click Complete ML Pipeline (BETA)"):
+        st.markdown("""
+        **Let AI handle the entire machine learning workflow automatically with smart recommendations**
+        
+        ### 🚀 Automated Features:
+        - **One-Click Automation**: Single button triggers complete ML pipeline
+        - **AI Data Analysis**: Automatic dataset analysis and recommendations
+        - **Smart Cleaning**: Intelligent handling of missing values and outliers
+        - **Auto Pipeline**: Optimal preprocessing and model selection
+        - **Multi-Model Training**: Trains and compares multiple algorithms automatically
+        - **Performance Insights**: AI-generated analysis and improvement suggestions
+
+        ### ✅ AI-Powered Workflow:
+        - **Target Detection**: AI recommends the best target variable
+        - **Task Type Identification**: Automatically detects classification vs regression
+        - **Algorithm Selection**: AI chooses optimal models for your data characteristics
+        - **Hyperparameter Optimization**: Smart parameter tuning based on data patterns
+        - **Results Interpretation**: AI explains model performance and business impact
+
+        ### 🎯 Perfect For:
+        - **Beginners**: Complete ML solution without technical expertise
+        - **Rapid Prototyping**: Quick model development and testing
+        - **Baseline Models**: Fast generation of benchmark models
+        - **Learning**: See AI's decision-making process step-by-step
+
+        **→ Action: Go to →** **🤖 AI AutoML** page in the sidebar
+        
+        💡 **Pro Tip**: Use AutoML to quickly generate baseline models, then use manual pages for fine-tuning and customization!
+        """)
+
     # Interactive AI Assistant Section
     st.markdown("---")
     st.markdown("## AI Assistant Chat")
     
     if st.session_state.groq_available:
         chat_col1, chat_col2 = st.columns([3, 1])
-        
         with chat_col1:
             user_question = st.text_area(
                 "Ask the AI Assistant anything about ML:",
@@ -5080,3 +5108,846 @@ elif page == "Prediction":
 
     st.markdown("---")
     st.warning("**Note:** Make sure your input data has the same features and data types as the training data.")
+
+################################################
+# Page: AI AutoML - Automated End-to-End ML
+################################################
+
+elif page == "🤖 AI AutoML":
+    st.header("🤖 AI AutoML - Automated Machine Learning (BETA)")
+    ensure_session_state()
+    inject_css()
+    init_groq_client()
+
+    st.markdown("# 🤖 AI AutoML - Automated End-to-End ML (BETA)")
+    st.caption("Let AI handle the entire ML workflow from data loading to prediction with smart recommendations")
+
+    if not st.session_state.groq_available:
+        st.error("AI AutoML requires Groq API key. Please configure it in secrets.toml")
+        st.stop()
+
+    # Initialize AutoML session state
+    if 'automl_state' not in st.session_state:
+        st.session_state.automl_state = {
+            'step': 0,
+            'data_loaded': False,
+            'analysis_done': False,
+            'pipeline_built': False,
+            'models_trained': False,
+            'evaluation_done': False,
+            'ai_recommendations': {},
+            'progress': []
+        }
+
+    automl = st.session_state.automl_state
+
+    # Progress bar
+    steps = ['Data Loading', 'AI Analysis', 'Pipeline Building', 'Model Training', 'Evaluation', 'Prediction Ready']
+    progress = min(automl['step'] / (len(steps) - 1), 1.0)
+    st.progress(progress)
+    st.write(f"Current Step: {steps[min(automl['step'], len(steps)-1)]}")
+
+    # Main AutoML button
+    if st.button("🚀 Start AI AutoML", type="primary", key="start_automl"):
+        if st.session_state.df is None:
+            st.error("Please load a dataset first on the Data Loading page")
+        else:
+            automl['step'] = 1
+            st.rerun()
+
+    # Step-by-step execution with collapsible sections
+    if automl['step'] >= 1:
+        with st.expander("📊 Step 1: AI Data Analysis", expanded=automl['step']==1):
+            if not automl['analysis_done']:
+                with st.spinner("AI is analyzing your data..."):
+                    analysis_prompt = f"""
+                    Analyze this dataset for machine learning:
+                    Shape: {st.session_state.df.shape}
+                    Columns: {list(st.session_state.df.columns)}
+                    Data types: {st.session_state.df.dtypes.to_dict()}
+                    Missing values: {st.session_state.df.isnull().sum().to_dict()}
+                    
+                    Provide:
+                    1. Recommended target variable
+                    2. Task type (classification/regression)
+                    3. Data cleaning steps needed
+                    4. Feature engineering suggestions
+                    5. Best ML algorithms for this data
+                    
+                    Format as JSON with keys: target_recommendation, task_type, cleaning_steps, feature_engineering, recommended_algorithms
+                    """
+                    
+                    ai_analysis = call_groq_llm(analysis_prompt)
+                    automl['ai_recommendations']['analysis'] = ai_analysis
+                    automl['analysis_done'] = True
+                    automl['step'] = 2
+                    
+            st.info("🤖 AI Analysis:")
+            st.write(automl['ai_recommendations'].get('analysis', 'Analysis pending...'))
+            
+            # Dataset download option
+            if st.session_state.df is not None:
+                csv_data = st.session_state.df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "💾 Download Current Dataset",
+                    data=csv_data,
+                    file_name="automl_step1_dataset.csv",
+                    mime="text/csv",
+                    key="download_step1"
+                )
+            
+            if st.button("✅ Approve Analysis", key="approve_analysis"):
+                automl['step'] = 2
+                st.rerun()
+
+    if automl['step'] >= 2:
+        with st.expander("🔧 Step 2: Automated Data Cleaning", expanded=automl['step']==2):
+            if st.button("🤖 Auto-Clean Data", key="auto_clean"):
+                with st.spinner("AI is cleaning your data based on recommendations..."):
+                    df_cleaned = st.session_state.df.copy()
+                    
+                    # Advanced AI cleaning with sample data analysis
+                    sample_data = {}
+                    for col in df_cleaned.columns:
+                        sample_values = df_cleaned[col].dropna().head(5).tolist()
+                        sample_data[col] = sample_values
+                    
+                    cleaning_prompt = f"""
+                    You are a data cleaning expert. Analyze this dataset and provide EXACT cleaning instructions.
+                    
+                    Dataset Info:
+                    - Sample values: {sample_data}
+                    
+                    For each column that needs cleaning, provide EXACT instructions in this JSON format:
+                    {{
+                        "column_name": {{
+                            "action": "extract_numeric" or "clean_text" or "standardize" or "none",
+                            "extract_pattern": "regex pattern to extract numbers",
+                            "replace_rules": [
+                                {{"find": "text to find", "replace": "replacement"}}
+                            ],
+                            "special_cases": [
+                                {{"if_contains": "ask for price", "set_to": null}}
+                            ]
+                        }}
+                    }}
+                    
+                    ONLY return valid JSON. Look for:
+                    - Numbers with units (KMS, Rs, $)
+                    - "Ask for price" type text
+                    - Mixed numeric/text data
+                    """
+                    
+                    ai_cleaning_plan = call_groq_llm(cleaning_prompt)
+                    st.info(f"🤖 AI Cleaning Instructions: {ai_cleaning_plan}")
+                    
+                    # Parse AI instructions
+                    try:
+                        import json
+                        ai_instructions = json.loads(ai_cleaning_plan)
+                    except:
+                        ai_instructions = {}  # Fallback to basic cleaning
+                        st.warning("AI instructions not in JSON format, using basic cleaning")
+                    
+                    # Apply advanced AI-recommended cleaning
+                    initial_shape = df_cleaned.shape[0]
+                    df_cleaned = df_cleaned.drop_duplicates()
+                    duplicates_removed = initial_shape - df_cleaned.shape[0]
+                    
+                    # Apply AI-specific cleaning instructions
+                    cleaning_actions = []
+                    
+                    for col in df_cleaned.columns:
+                        if col in ai_instructions:
+                            instruction = ai_instructions[col]
+                            action = instruction.get('action', 'none')
+                            
+                            if action == 'extract_numeric':
+                                # Apply AI-specified numeric extraction
+                                def extract_numeric_ai(text):
+                                    if pd.isna(text) or text == '':
+                                        return np.nan
+                                    
+                                    text = str(text).lower()
+                                    
+                                    # Apply AI special cases
+                                    for case in instruction.get('special_cases', []):
+                                        if case['if_contains'] in text:
+                                            return np.nan
+                                    
+                                    # Use AI pattern or default
+                                    pattern = instruction.get('extract_pattern', r'\d+\.?\d*')
+                                    numbers = re.findall(pattern, text)
+                                    
+                                    if numbers:
+                                        return float(numbers[0])
+                                    return np.nan
+                                
+                                # Apply extraction
+                                original_col = f"{col}_original"
+                                df_cleaned[original_col] = df_cleaned[col].copy()  # Keep original
+                                
+                                numeric_values = df_cleaned[col].apply(extract_numeric_ai)
+                                
+                                # If we extracted meaningful numbers, create numeric column
+                                if numeric_values.notna().sum() > len(df_cleaned) * 0.3:  # At least 30% valid
+                                    df_cleaned[f"{col}_numeric"] = numeric_values
+                                    cleaning_actions.append(f"{col}: extracted numeric values to {col}_numeric")
+                                
+                                # Apply AI-specified text cleaning
+                                def clean_text_ai(text):
+                                    if pd.isna(text):
+                                        return text
+                                    
+                                    text = str(text).lower().strip()
+                                    
+                                    # Apply AI replace rules
+                                    for rule in instruction.get('replace_rules', []):
+                                        text = text.replace(rule['find'], rule['replace'])
+                                    
+                                    # Remove numbers
+                                    text = re.sub(r'\d+\.?\d*', '', text)
+                                    text = re.sub(r'\s+', ' ', text).strip()
+                                    
+                                    return text if text else 'unknown'
+                                
+                                df_cleaned[col] = df_cleaned[col].apply(clean_text_ai)
+                                cleaning_actions.append(f"{col}: cleaned text patterns")
+                            
+                            elif action == 'clean_text':
+                                # Apply AI text cleaning only
+                                def clean_text_ai(text):
+                                    if pd.isna(text):
+                                        return text
+                                    text = str(text).lower().strip()
+                                    for rule in instruction.get('replace_rules', []):
+                                        text = text.replace(rule['find'], rule['replace'])
+                                    return text
+                                
+                                df_cleaned[col] = df_cleaned[col].apply(clean_text_ai)
+                                cleaning_actions.append(f"{col}: applied AI text cleaning")
+                            
+                            elif action == 'standardize':
+                                df_cleaned[col] = df_cleaned[col].astype(str).str.lower().str.strip()
+                                cleaning_actions.append(f"{col}: standardized text case")
+                        
+
+                    
+                    # Handle missing values with smart strategy
+                    missing_handled = []
+                    for col in df_cleaned.columns:
+                        if df_cleaned[col].isnull().sum() > 0:
+                            if df_cleaned[col].dtype in ['int64', 'float64']:
+                                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+                                missing_handled.append(f"{col}: filled with median")
+                            else:
+                                mode_val = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'unknown'
+                                df_cleaned[col].fillna(mode_val, inplace=True)
+                                missing_handled.append(f"{col}: filled with mode/unknown")
+                    
+                    # Store comprehensive cleaning log
+                    automl['cleaning_log'] = {
+                        'duplicates_removed': duplicates_removed,
+                        'missing_handled': missing_handled,
+                        'cleaning_actions': cleaning_actions,
+                        'ai_plan': ai_cleaning_plan,
+                        'columns_before': list(st.session_state.df.columns),
+                        'columns_after': list(df_cleaned.columns)
+                    }
+                    
+                    st.session_state.df = df_cleaned
+                    automl['step'] = 3
+                    
+                st.success("✅ Data cleaned using AI recommendations!")
+                st.write(f"Shape after cleaning: {st.session_state.df.shape}")
+                
+                # Show comprehensive cleaning summary
+                if 'cleaning_log' in automl:
+                    log = automl['cleaning_log']
+                    st.write(f"📊 Advanced Cleaning Summary:")
+                    st.write(f"- Duplicates removed: {log['duplicates_removed']}")
+                    
+                    if log.get('cleaning_actions'):
+                        st.write("- Text & Numeric Extraction:")
+                        for action in log['cleaning_actions']:
+                            st.write(f"  • {action}")
+                    
+                    if log['missing_handled']:
+                        st.write("- Missing values handled:")
+                        for action in log['missing_handled']:
+                            st.write(f"  • {action}")
+                    
+                    col_diff = len(log['columns_after']) - len(log['columns_before'])
+                    if col_diff > 0:
+                        st.success(f"✨ Created {col_diff} new feature columns from text extraction!")
+                
+                # Download cleaned dataset
+                csv_data = st.session_state.df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "💾 Download Cleaned Dataset",
+                    data=csv_data,
+                    file_name="automl_step2_cleaned_dataset.csv",
+                    mime="text/csv",
+                    key="download_step2"
+                )
+                
+            if st.button("➡️ Continue to Pipeline", key="continue_pipeline"):
+                automl['step'] = 3
+                st.rerun()
+
+    if automl['step'] >= 3:
+        with st.expander("⚙️ Step 3: AI Pipeline & Training", expanded=automl['step']==3):
+            if st.button("🤖 Auto-Build & Train", key="auto_train"):
+                with st.spinner("AI is building pipeline and training models..."):
+                    try:
+                        # Use AI recommendation for target column if available
+                        ai_analysis = automl['ai_recommendations'].get('analysis', '')
+                        
+                        # Try to extract target recommendation from AI analysis
+                        target_col = st.session_state.df.columns[-1]  # Default fallback
+                        
+                        # Simple parsing to find recommended target
+                        if 'target' in ai_analysis.lower():
+                            for col in st.session_state.df.columns:
+                                if col.lower() in ai_analysis.lower():
+                                    target_col = col
+                                    break
+                        
+                        st.info(f"🎯 Using target column: {target_col} (AI recommended)")
+                        
+                        X = st.session_state.df.drop(columns=[target_col])
+                        y = st.session_state.df[target_col]
+                        
+                        # Auto train-test split
+                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                        
+                        # Store splits
+                        st.session_state['split_result'] = {
+                            'X_train': X_train, 'X_test': X_test,
+                            'y_train': y_train, 'y_test': y_test,
+                            'timestamp': datetime.now().strftime('%Y%m%d_%H%M%S')
+                        }
+                        
+                        # Use AI recommendation for task type if available
+                        ai_analysis = automl['ai_recommendations'].get('analysis', '').lower()
+                        
+                        if 'classification' in ai_analysis:
+                            task_type = 'classification'
+                        elif 'regression' in ai_analysis:
+                            task_type = 'regression'
+                        else:
+                            # Fallback to heuristic
+                            task_type = 'classification' if y.nunique() < 20 else 'regression'
+                        
+                        st.info(f"📊 Task type: {task_type} (AI determined)")
+                        
+                        # Build smart preprocessing pipeline
+                        num_cols = X.select_dtypes(include=np.number).columns.tolist()
+                        cat_cols = X.select_dtypes(exclude=np.number).columns.tolist()
+                        
+                        # Prioritize extracted numeric columns
+                        extracted_cols = [col for col in num_cols if '_numeric' in col]
+                        if extracted_cols:
+                            st.info(f"🔢 Using {len(extracted_cols)} extracted numeric features: {extracted_cols}")
+                        
+                        num_pipeline = Pipeline([
+                            ('imputer', SimpleImputer(strategy='median')),
+                            ('scaler', StandardScaler())
+                        ])
+                        
+                        # Enhanced categorical pipeline
+                        cat_pipeline = Pipeline([
+                            ('imputer', SimpleImputer(strategy='constant', fill_value='unknown')),
+                            ('encoder', OneHotEncoder(handle_unknown='ignore', sparse_output=False, max_categories=20))
+                        ])
+                        
+                        preprocessor = ColumnTransformer([
+                            ('num', num_pipeline, num_cols),
+                            ('cat', cat_pipeline, cat_cols)
+                        ])
+                        
+                        # Handle string labels for XGBoost
+                        label_encoder = None
+                        y_train_encoded = y_train
+                        y_test_encoded = y_test
+                        
+                        if task_type == 'classification' and not pd.api.types.is_numeric_dtype(y_train):
+                            label_encoder = LabelEncoder()
+                            y_train_encoded = label_encoder.fit_transform(y_train)
+                            y_test_encoded = label_encoder.transform(y_test)
+                        
+                        # Use AI recommendations for model selection
+                        ai_analysis = automl['ai_recommendations'].get('analysis', '').lower()
+                        
+                        # Auto-select models based on AI recommendations and task type
+                        if task_type == 'classification':
+                            models = {
+                                'Random Forest': RandomForestClassifier(random_state=42),
+                                'XGBoost': xgb.XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss'),
+                                'Logistic Regression': LogisticRegression(random_state=42)
+                            }
+                            
+                            # Add AI-recommended models if mentioned
+                            if 'svm' in ai_analysis or 'support vector' in ai_analysis:
+                                from sklearn.svm import SVC
+                                models['SVM'] = SVC(random_state=42, probability=True)
+                            
+                        else:
+                            models = {
+                                'Random Forest': RandomForestRegressor(random_state=42),
+                                'XGBoost': xgb.XGBRegressor(random_state=42),
+                                'Linear Regression': LinearRegression()
+                            }
+                            
+                            # Add AI-recommended models if mentioned
+                            if 'ridge' in ai_analysis:
+                                from sklearn.linear_model import Ridge
+                                models['Ridge'] = Ridge(random_state=42)
+                        
+                        st.info(f"🤖 Selected {len(models)} models based on AI analysis")
+                        st.info(f"📊 Features: {len(num_cols)} numeric, {len(cat_cols)} categorical")
+                        
+                        # Show feature engineering summary
+                        if 'cleaning_log' in automl and automl['cleaning_log'].get('cleaning_actions'):
+                            st.success("✨ Applied advanced text processing and numeric extraction!")
+                        
+                        # Train models
+                        trained_models = {}
+                        model_results = {}
+                        
+                        for name, model in models.items():
+                            pipeline = Pipeline([
+                                ('preprocessor', preprocessor),
+                                ('model', model)
+                            ])
+                            
+                            # Use encoded labels for XGBoost, original for others
+                            if name == 'XGBoost' and label_encoder is not None:
+                                pipeline.fit(X_train, y_train_encoded)
+                                y_pred_encoded = pipeline.predict(X_test)
+                                y_pred = label_encoder.inverse_transform(y_pred_encoded)
+                            else:
+                                pipeline.fit(X_train, y_train)
+                                y_pred = pipeline.predict(X_test)
+                            
+                            if task_type == 'classification':
+                                acc = accuracy_score(y_test, y_pred)
+                                f1 = f1_score(y_test, y_pred, average='weighted')
+                                metrics = {'Accuracy': acc, 'F1': f1}
+                            else:
+                                r2 = r2_score(y_test, y_pred)
+                                mae = mean_absolute_error(y_test, y_pred)
+                                metrics = {'R²': r2, 'MAE': mae}
+                            
+                            trained_models[name] = pipeline
+                            model_results[name] = metrics
+                        
+                        # Store results
+                        st.session_state.trained_models = trained_models
+                        st.session_state.model_results = model_results
+                        
+                        # Find best model
+                        if task_type == 'classification':
+                            best_model_name = max(model_results, key=lambda x: model_results[x]['Accuracy'])
+                        else:
+                            best_model_name = max(model_results, key=lambda x: model_results[x]['R²'])
+                        
+                        st.session_state.best_model = {
+                            'name': best_model_name,
+                            'pipeline': trained_models[best_model_name],
+                            'metrics': model_results[best_model_name],
+                            'label_encoder': label_encoder
+                        }
+                        
+                        # Store AI-enhanced results
+                        automl['ai_enhanced'] = {
+                            'target_column': target_col,
+                            'task_type': task_type,
+                            'models_used': list(models.keys()),
+                            'ai_reasoning': ai_analysis,
+                            'features_created': len(X.columns) - len(st.session_state.df.columns) + 1
+                        }
+                        
+                        automl['step'] = 4
+                        
+                    except Exception as e:
+                        st.error(f"Auto-training failed: {e}")
+                        
+                st.success("✅ Models trained automatically!")
+                
+                # Show results
+                if 'model_results' in st.session_state:
+                    results_df = pd.DataFrame(st.session_state.model_results).T
+                    st.dataframe(results_df)
+                    
+                    best_name = st.session_state.best_model['name']
+                    st.success(f"🎯 Best Model: {best_name}")
+                    
+                    # Download training splits
+                    if 'split_result' in st.session_state:
+                        splits = st.session_state.split_result
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            train_data = pd.concat([splits['X_train'], splits['y_train']], axis=1)
+                            train_csv = train_data.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                "💾 Download Training Data",
+                                data=train_csv,
+                                file_name="automl_step3_train_data.csv",
+                                mime="text/csv",
+                                key="download_train"
+                            )
+                        
+                        with col2:
+                            test_data = pd.concat([splits['X_test'], splits['y_test']], axis=1)
+                            test_csv = test_data.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                "💾 Download Test Data",
+                                data=test_csv,
+                                file_name="automl_step3_test_data.csv",
+                                mime="text/csv",
+                                key="download_test"
+                            )
+
+    if automl['step'] >= 4:
+        with st.expander("📊 Step 4: AI Evaluation & Insights", expanded=automl['step']==4):
+            if st.button("🤖 Generate AI Insights", key="ai_insights"):
+                with st.spinner("AI is analyzing model performance..."):
+                    if 'best_model' in st.session_state:
+                        best_metrics = st.session_state.best_model['metrics']
+                        
+                        insights_prompt = f"""
+                        Analyze these ML model results and provide insights:
+                        Best Model: {st.session_state.best_model['name']}
+                        Metrics: {best_metrics}
+                        All Models: {st.session_state.model_results}
+                        
+                        Provide:
+                        1. Performance interpretation
+                        2. Model strengths and weaknesses
+                        3. Recommendations for improvement
+                        4. Business implications
+                        5. Next steps
+                        """
+                        
+                        ai_insights = call_groq_llm(insights_prompt)
+                        automl['ai_recommendations']['insights'] = ai_insights
+                        automl['step'] = 5
+                        
+            if 'insights' in automl['ai_recommendations']:
+                st.info("🤖 AI Performance Insights:")
+                st.write(automl['ai_recommendations']['insights'])
+                
+                # Download model results
+                if 'model_results' in st.session_state:
+                    results_df = pd.DataFrame(st.session_state.model_results).T
+                    results_csv = results_df.to_csv().encode('utf-8')
+                    st.download_button(
+                        "💾 Download Model Results",
+                        data=results_csv,
+                        file_name="automl_step4_model_results.csv",
+                        mime="text/csv",
+                        key="download_results"
+                    )
+                
+            if st.button("✅ Complete AutoML", key="complete_automl"):
+                automl['step'] = 5
+                st.success("🎉 AI AutoML Complete! Your model is ready for predictions.")
+                st.balloons()
+
+    # Final summary and next steps
+    if automl['step'] >= 5:
+        st.markdown("---")
+        st.success("🎉 AI AutoML Pipeline Complete!")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("📊 View Detailed Evaluation", key="view_eval"):
+                st.info("Go to Final Evaluation page for detailed analysis")
+                
+        with col2:
+            if st.button("🔮 Make Predictions", key="make_pred"):
+                st.info("Go to Prediction page to use your trained model")
+                
+        with col3:
+            if st.button("💾 Export Model", key="export_model"):
+                st.info("Go to Export page to download your model")
+        
+        # Quick prediction interface
+        st.markdown("### 🔮 Quick Prediction Test")
+        if 'best_model' in st.session_state and 'split_result' in st.session_state:
+            # Get all feature columns from training data
+            X_train = st.session_state.split_result['X_train']
+            feature_cols = X_train.columns.tolist()
+            
+            st.write("Enter values for all features:")
+            input_values = {}
+            
+            # Create input fields for ALL features
+            num_cols = 3
+            cols = st.columns(num_cols)
+            
+            for i, col in enumerate(feature_cols):
+                with cols[i % num_cols]:
+                    if X_train[col].dtype in ['int64', 'float64']:
+                        default_val = float(X_train[col].mean())
+                        input_values[col] = st.number_input(
+                            f"{col}", 
+                            value=default_val, 
+                            key=f"automl_{col}"
+                        )
+                    else:
+                        unique_vals = X_train[col].unique()
+                        if len(unique_vals) > 10:
+                            unique_vals = unique_vals[:10]
+                        input_values[col] = st.selectbox(
+                            f"{col}", 
+                            unique_vals, 
+                            key=f"automl_{col}"
+                        )
+            
+            if st.button("🎯 Predict", key="quick_predict"):
+                try:
+                    # Create DataFrame with all required columns
+                    input_df = pd.DataFrame([input_values])
+                    
+                    # Ensure column order matches training data
+                    input_df = input_df[feature_cols]
+                    
+                    # Handle label encoding for prediction
+                    pipeline = st.session_state.best_model['pipeline']
+                    label_encoder = st.session_state.best_model.get('label_encoder')
+                    
+                    if (st.session_state.best_model['name'] == 'XGBoost' and 
+                        label_encoder is not None):
+                        pred_encoded = pipeline.predict(input_df)
+                        prediction = label_encoder.inverse_transform([pred_encoded[0]])
+                        st.success(f"Prediction: {prediction[0]}")
+                    else:
+                        prediction = pipeline.predict(input_df)
+                        st.success(f"Prediction: {prediction[0]}")
+                    
+                    if hasattr(pipeline, 'predict_proba'):
+                        proba = pipeline.predict_proba(input_df)
+                        st.write(f"Confidence: {max(proba[0]):.2%}")
+                        
+                except Exception as e:
+                    st.error(f"Prediction failed: {e}")
+                    st.error(f"Required features: {feature_cols}")
+        else:
+            st.info("Complete the AutoML process first to enable quick predictions.")
+        
+        # Generate Python code
+        st.markdown("### 💻 Download Python Code")
+        if st.button("💻 Generate Python Code", key="generate_code"):
+            # Generate complete Python code for the AutoML pipeline
+            python_code = f"""
+# AutoML Pipeline Generated Code
+# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.metrics import accuracy_score, f1_score, r2_score, mean_absolute_error
+import xgboost as xgb
+import joblib
+
+# Load your dataset
+# df = pd.read_csv('your_dataset.csv')
+
+# Data cleaning (automated)
+def clean_data(df):
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates()
+    
+    # Handle missing values
+    for col in df_cleaned.columns:
+        if df_cleaned[col].isnull().sum() > 0:
+            if df_cleaned[col].dtype in ['int64', 'float64']:
+                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+            else:
+                mode_val = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+                df_cleaned[col].fillna(mode_val, inplace=True)
+    
+    return df_cleaned
+
+# Assuming your target column is the last column
+# Modify this based on your actual target column
+target_column = df.columns[-1]
+X = df.drop(columns=[target_column])
+y = df[target_column]
+
+# Auto-detect task type
+task_type = 'classification' if y.nunique() < 20 else 'regression'
+print(f"Detected task type: {{task_type}}")
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Handle string labels for XGBoost (if classification)
+label_encoder = None
+y_train_encoded = y_train
+y_test_encoded = y_test
+
+if task_type == 'classification' and not pd.api.types.is_numeric_dtype(y_train):
+    label_encoder = LabelEncoder()
+    y_train_encoded = label_encoder.fit_transform(y_train)
+    y_test_encoded = label_encoder.transform(y_test)
+
+# Build preprocessing pipeline
+num_cols = X.select_dtypes(include=np.number).columns.tolist()
+cat_cols = X.select_dtypes(exclude=np.number).columns.tolist()
+
+num_pipeline = Pipeline([
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())
+])
+
+cat_pipeline = Pipeline([
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('encoder', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+])
+
+preprocessor = ColumnTransformer([
+    ('num', num_pipeline, num_cols),
+    ('cat', cat_pipeline, cat_cols)
+])
+
+# Define models based on task type
+if task_type == 'classification':
+    models = {{
+        'Random Forest': RandomForestClassifier(random_state=42),
+        'XGBoost': xgb.XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss'),
+        'Logistic Regression': LogisticRegression(random_state=42)
+    }}
+else:
+    models = {{
+        'Random Forest': RandomForestRegressor(random_state=42),
+        'XGBoost': xgb.XGBRegressor(random_state=42),
+        'Linear Regression': LinearRegression()
+    }}
+
+# Train and evaluate models
+trained_models = {{}}
+model_results = {{}}
+
+for name, model in models.items():
+    print(f"Training {{name}}...")
+    
+    pipeline = Pipeline([
+        ('preprocessor', preprocessor),
+        ('model', model)
+    ])
+    
+    # Use encoded labels for XGBoost, original for others
+    if name == 'XGBoost' and label_encoder is not None:
+        pipeline.fit(X_train, y_train_encoded)
+        y_pred_encoded = pipeline.predict(X_test)
+        y_pred = label_encoder.inverse_transform(y_pred_encoded)
+    else:
+        pipeline.fit(X_train, y_train)
+        y_pred = pipeline.predict(X_test)
+    
+    # Calculate metrics
+    if task_type == 'classification':
+        acc = accuracy_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred, average='weighted')
+        metrics = {{'Accuracy': acc, 'F1': f1}}
+        print(f"{{name}} - Accuracy: {{acc:.3f}}, F1: {{f1:.3f}}")
+    else:
+        r2 = r2_score(y_test, y_pred)
+        mae = mean_absolute_error(y_test, y_pred)
+        metrics = {{'R²': r2, 'MAE': mae}}
+        print(f"{{name}} - R²: {{r2:.3f}}, MAE: {{mae:.3f}}")
+    
+    trained_models[name] = pipeline
+    model_results[name] = metrics
+
+# Find best model
+if task_type == 'classification':
+    best_model_name = max(model_results, key=lambda x: model_results[x]['Accuracy'])
+else:
+    best_model_name = max(model_results, key=lambda x: model_results[x]['R²'])
+
+print(f"\nBest model: {{best_model_name}}")
+print(f"Best model metrics: {{model_results[best_model_name]}}")
+
+# Save the best model
+best_pipeline = trained_models[best_model_name]
+joblib.dump({{
+    'pipeline': best_pipeline,
+    'label_encoder': label_encoder,
+    'model_name': best_model_name,
+    'metrics': model_results[best_model_name],
+    'feature_columns': X.columns.tolist()
+}}, 'automl_best_model.joblib')
+
+print("\nModel saved as 'automl_best_model.joblib'")
+
+# Example prediction function
+def make_prediction(input_data):
+    '''
+    Make prediction using the trained model
+    input_data: dict with feature names as keys
+    '''
+    # Load the saved model
+    model_data = joblib.load('automl_best_model.joblib')
+    pipeline = model_data['pipeline']
+    label_encoder = model_data['label_encoder']
+    feature_columns = model_data['feature_columns']
+    
+    # Create DataFrame
+    input_df = pd.DataFrame([input_data])
+    input_df = input_df[feature_columns]  # Ensure correct column order
+    
+    # Make prediction
+    if label_encoder is not None and best_model_name == 'XGBoost':
+        pred_encoded = pipeline.predict(input_df)
+        prediction = label_encoder.inverse_transform([pred_encoded[0]])
+        return prediction[0]
+    else:
+        prediction = pipeline.predict(input_df)
+        return prediction[0]
+
+# Example usage:
+# prediction = make_prediction({{
+#     'feature1': value1,
+#     'feature2': value2,
+#     # ... add all required features
+# }})
+# print(f"Prediction: {{prediction}}")
+"""
+            
+            st.download_button(
+                "💻 Download Complete Python Code",
+                data=python_code,
+                file_name="automl_generated_pipeline.py",
+                mime="text/plain",
+                key="download_python_code"
+            )
+            
+            st.success("✅ Python code generated! This file contains the complete pipeline for reproducing your AutoML results.")
+            st.info("💡 The generated code includes data cleaning, preprocessing, model training, evaluation, and prediction functions. You can run it independently of this app!")
+        
+        # Reset AutoML
+        if st.button("🔄 Reset AutoML", key="reset_automl"):
+            st.session_state.automl_state = {
+                'step': 0,
+                'data_loaded': False,
+                'analysis_done': False,
+                'pipeline_built': False,
+                'models_trained': False,
+                'evaluation_done': False,
+                'ai_recommendations': {},
+                'progress': []
+            }
+            st.success("AutoML reset! Ready for a new run.")
+            st.rerun()

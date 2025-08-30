@@ -807,7 +807,7 @@ if page == "Home":
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666; font-size: 0.9em;'>
-        <p>ML Playground v2.0 | AI-Powered Workflow</p>
+        <p>© 2025 Arindam Roy | ML Playground v2.0 | AI-Powered Workflow | All Rights Reserved | No Part of this app may be reproduced without permission.</p>
         <p>Start with Step 1 above or use the sidebar to jump to any step!</p>
     </div>
     """, unsafe_allow_html=True)
@@ -5016,7 +5016,7 @@ elif page == "Prediction":
                             for col in proba_df_display.columns:
                                 proba_df_display[col] = proba_df_display[col].apply(lambda x: f"{x:.2%}")
                             
-                            st.dataframe(proba_df_display.style.highlight_max(axis=1, color="lightgreen"))
+                            #st.dataframe(proba_df_display.style.highlight_max(axis=1, color="lightgreen"))
                             
                             # Show probability distribution chart
                             if len(proba_df.columns) > 1:
